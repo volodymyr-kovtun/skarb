@@ -1,0 +1,15 @@
+# .NET
+bin/
+obj/
+*.user
+backend/Skarb.Api/wwwroot/
+
+# Node
+node_modules/
+dist/
+*.local
+
+# OS / editor
+.DS_Store
+.vs/
+.idea/

@@ -18,7 +18,7 @@ public class SyncService(IServiceScopeFactory scopeFactory, ILogger<SyncService>
 
     public IReadOnlyDictionary<Guid, string> Running => _running;
 
-    public async Task<List<Guid>> TriggerAsync(Guid? connectionId = null)
+    public async Task<List<Guid>> TriggerAsync(Guid? connectionId = null, bool full = false)
     {
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SkarbDbContext>();
@@ -32,7 +32,7 @@ public class SyncService(IServiceScopeFactory scopeFactory, ILogger<SyncService>
         {
             if (!_running.TryAdd(conn.Id, conn.DisplayName)) continue;
             started.Add(conn.Id);
-            tasks.Add(Task.Run(() => RunOneAsync(conn.Id)));
+            tasks.Add(Task.Run(() => RunOneAsync(conn.Id, full)));
         }
 
         // Transfer detection needs both legs, so it runs once after the whole round —
@@ -60,7 +60,7 @@ public class SyncService(IServiceScopeFactory scopeFactory, ILogger<SyncService>
         }
     }
 
-    private async Task RunOneAsync(Guid connectionId)
+    private async Task RunOneAsync(Guid connectionId, bool full)
     {
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SkarbDbContext>();
@@ -72,7 +72,7 @@ public class SyncService(IServiceScopeFactory scopeFactory, ILogger<SyncService>
             var provider = providers.FirstOrDefault(p => p.Key == conn.Provider)
                 ?? throw new InvalidOperationException($"No provider registered for '{conn.Provider}'");
 
-            var result = await provider.SyncAsync(conn, CancellationToken.None);
+            var result = await provider.SyncAsync(conn, full, CancellationToken.None);
 
             conn.LastSyncedAt = DateTime.UtcNow;
             conn.LastError = null;
@@ -80,7 +80,7 @@ public class SyncService(IServiceScopeFactory scopeFactory, ILogger<SyncService>
             db.SyncLogs.Add(new SyncLog
             {
                 Provider = conn.Provider,
-                Message = $"{conn.DisplayName}: synced, {result.NewTransactions} new transaction(s)",
+                Message = $"{conn.DisplayName}: {(full ? "full re-sync" : "synced")}, {result.NewTransactions} new transaction(s)",
                 NewTransactions = result.NewTransactions,
             });
         }

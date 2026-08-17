@@ -22,7 +22,7 @@ public class EnableBankingProvider(
 {
     public string Key => ProviderNames.EnableBanking;
 
-    public async Task<SyncResult> SyncAsync(BankConnection connection, CancellationToken ct)
+    public async Task<SyncResult> SyncAsync(BankConnection connection, bool full, CancellationToken ct)
     {
         var settings = EnableBankingSettings.From(connection);
         if (string.IsNullOrWhiteSpace(settings.SessionId))
@@ -38,7 +38,8 @@ public class EnableBankingProvider(
         foreach (var account in accounts)
         {
             await RefreshBalanceAsync(settings, account, ct);
-            newTx += await FetchTransactionsAsync(settings, account, watermarks.GetValueOrDefault(account.Id), ct);
+            newTx += await FetchTransactionsAsync(settings, account,
+                !full && watermarks.TryGetValue(account.Id, out var last) ? last : null, ct);
         }
 
         await db.SaveChangesAsync(ct);
@@ -145,12 +146,20 @@ public class EnableBankingProvider(
         var indicator = tx.TryGetProperty("credit_debit_indicator", out var cdi) ? cdi.GetString() : "DBIT";
         amount = indicator == "DBIT" ? -Math.Abs(amount) : Math.Abs(amount);
 
-        var remittance = tx.TryGetProperty("remittance_information", out var ri) && ri.ValueKind == JsonValueKind.Array
-            ? string.Join(" ", ri.EnumerateArray().Select(x => x.GetString())) : "";
+        // Banks put "[details..., TYPE-CODE]" in remittance_information (PKO: "CARD-PAYMENT",
+        // "MOBILE-PAYMENT-C2C", "FEE", ...). Split the type off so it can drive
+        // categorization and never pollutes the description.
+        var parts = tx.TryGetProperty("remittance_information", out var ri) && ri.ValueKind == JsonValueKind.Array
+            ? ri.EnumerateArray().Select(x => x.GetString() ?? "").Where(x => x.Length > 0).ToList() : [];
+        var typeCode = parts.Count > 1 && LooksLikeTypeCode(parts[^1]) ? parts[^1] : null;
+        var details = string.Join(" ", typeCode is null ? parts : parts.Take(parts.Count - 1)).Trim();
+        var remittance = string.Join(" ", parts);
+
         var counterParty = PartyName(tx, amount < 0 ? "creditor" : "debtor");
         var counterIban = PartyIban(tx, amount < 0 ? "creditor_account" : "debtor_account");
-        var description = !string.IsNullOrWhiteSpace(counterParty) ? counterParty! :
-            !string.IsNullOrWhiteSpace(remittance) ? remittance : "Transaction";
+        var description = !string.IsNullOrWhiteSpace(counterParty) ? counterParty!
+            : !string.IsNullOrWhiteSpace(details) ? CleanCardMerchant(details, typeCode)
+            : typeCode ?? "Transaction";
 
         var dateStr = FirstString(tx, "booking_date", "transaction_date", "value_date");
         var occurredAt = DateTime.TryParse(dateStr, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal, out var dt)
@@ -168,8 +177,44 @@ public class EnableBankingProvider(
         {
             CounterParty = counterParty,
             CounterIban = counterIban,
+            TypeCode = typeCode,
             Note = string.IsNullOrWhiteSpace(remittance) || remittance == description ? null : remittance,
         };
+    }
+
+    /// <summary>"CARD-PAYMENT", "TRANSFER-IN", "FEE" — uppercase letters/digits joined by dashes, no spaces.</summary>
+    private static bool LooksLikeTypeCode(string s) =>
+        s.Length is >= 3 and <= 40 && s.All(c => char.IsAsciiLetterUpper(c) || char.IsAsciiDigit(c) || c == '-');
+
+    // PKO card rows arrive as CITY+MERCHANT+COUNTRY glued together, e.g. "WARSZAWAJMP S.A. BIEDRONKA 7184PL"
+    // or "DUBLINANTHROPIC* CLAUDE SUBIE". Best-effort cleanup: strip a trailing 2-letter country
+    // and a leading known city prefix; the raw text stays in the note for search.
+    private static readonly string[] CityPrefixes =
+    [
+        "WARSZAWA", "KRAKOW", "KRAKÓW", "WROCLAW", "WROCŁAW", "POZNAN", "POZNAŃ", "GDANSK", "GDAŃSK",
+        "LODZ", "ŁÓDŹ", "KATOWICE", "LUBLIN", "SZCZECIN", "BYDGOSZCZ", "DUBLIN", "LONDON", "AMSTERDAM",
+        "BERLIN", "PARIS", "SAN JUAN", "KOSHICE", "KYIV", "KIEV", "LWOW", "LVIV",
+    ];
+
+    private static string CleanCardMerchant(string details, string? typeCode)
+    {
+        if (typeCode is null || !typeCode.StartsWith("CARD", StringComparison.Ordinal)) return details;
+        var s = details;
+        if (s.Length > 3 && char.IsAsciiLetterUpper(s[^1]) && char.IsAsciiLetterUpper(s[^2]) && s[^3] != ' ' && !char.IsDigit(s[^3]))
+        {
+            // Trailing country code glued on ("...COFFEE.PLPL", "...GymBeamSK") — but keep e.g. "S.A." intact.
+            var candidate = s[..^2];
+            if (candidate.Length >= 4) s = candidate;
+        }
+        foreach (var city in CityPrefixes)
+        {
+            if (s.StartsWith(city, StringComparison.OrdinalIgnoreCase) && s.Length > city.Length + 2)
+            {
+                s = s[city.Length..].TrimStart();
+                break;
+            }
+        }
+        return s.Length >= 3 ? s : details;
     }
 
     private static string? PartyName(JsonElement tx, string prop) =>

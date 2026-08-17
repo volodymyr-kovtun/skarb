@@ -41,7 +41,7 @@ public class TransactionIngestor(SkarbDbContext db, ICategorizer categorizer) : 
                 OccurredAt = item.OccurredAtUtc,
                 Source = item.Source,
                 Note = item.Note,
-                CategoryId = await categorizer.ResolveAsync(item.Description, item.CounterParty, item.Mcc, item.Amount, ct),
+                CategoryId = await categorizer.ResolveAsync(item, ct),
             };
             db.Transactions.Add(tx);
             existing[item.ExternalId] = tx; // in-batch duplicates hit the update path above

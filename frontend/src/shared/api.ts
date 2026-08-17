@@ -99,6 +99,7 @@ export const api = {
   rules: () => get<Rule[]>('/api/rules'),
   createRule: (body: { pattern: string; categoryId: string; priority: number }) => post('/api/rules', body),
   deleteRule: (id: string) => del(`/api/rules/${id}`),
+  applyRules: () => post<{ scanned: number; categorized: number }>('/api/rules/apply'),
 
   connections: () => get<Connection[]>('/api/connections'),
   deleteConnection: (id: string) => del(`/api/connections/${id}`),
@@ -116,7 +117,7 @@ export const api = {
     post<{ status: string }>(`/api/connections/${id}/enablebanking/complete`, { code }),
 
   syncAll: () => post<{ started: string[] }>('/api/sync'),
-  syncOne: (id: string) => post<{ started: string[] }>(`/api/sync/${id}`),
+  syncOne: (id: string, full = false) => post<{ started: string[] }>(`/api/sync/${id}${full ? '?full=true' : ''}`),
   syncStatus: () => get<SyncStatus>('/api/sync/status'),
 
   importCsv: (body: {

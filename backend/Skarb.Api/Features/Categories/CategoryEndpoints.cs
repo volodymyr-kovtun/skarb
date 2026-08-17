@@ -3,6 +3,7 @@ using Skarb.Api.Common.Abstractions;
 using Skarb.Api.Common.Contracts;
 using Skarb.Api.Common.Domain;
 using Skarb.Api.Common.Persistence;
+using Skarb.Api.Common.Services;
 
 namespace Skarb.Api.Features.Categories;
 
@@ -98,6 +99,28 @@ public class CategoryEndpoints : IEndpointGroup
             db.CategoryRules.Remove(rule);
             await db.SaveChangesAsync();
             return Results.NoContent();
+        });
+
+        // Re-run categorization over transactions that still have no category (e.g. after adding
+        // rules). Never overrides a category the user set by hand — only fills blanks.
+        rules.MapPost("/apply", async (SkarbDbContext db, ICategorizer categorizer) =>
+        {
+            var pending = await db.Transactions
+                .Where(t => t.CategoryId == null && !t.IsInternal)
+                .ToListAsync();
+            var updated = 0;
+            foreach (var t in pending)
+            {
+                var probe = new IncomingTransaction(t.ExternalId ?? t.Id.ToString(), t.Amount, t.Currency,
+                    t.Description, t.OccurredAt, t.Source)
+                { CounterParty = t.CounterParty, Mcc = t.Mcc, Note = t.Note };
+                var cat = await categorizer.ResolveAsync(probe, CancellationToken.None);
+                if (cat is null) continue;
+                t.CategoryId = cat;
+                updated++;
+            }
+            await db.SaveChangesAsync();
+            return Results.Ok(new { scanned = pending.Count, categorized = updated });
         });
     }
 

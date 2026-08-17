@@ -11,8 +11,8 @@ public class SyncEndpoints : IEndpointGroup
         var group = app.MapGroup("/api/sync");
 
         group.MapPost("/", async (ISyncService sync) => new { started = await sync.TriggerAsync() });
-        group.MapPost("/{connectionId:guid}", async (Guid connectionId, ISyncService sync) =>
-            new { started = await sync.TriggerAsync(connectionId) });
+        group.MapPost("/{connectionId:guid}", async (Guid connectionId, ISyncService sync, bool full = false) =>
+            new { started = await sync.TriggerAsync(connectionId, full) });
 
         group.MapGet("/status", async (ISyncService sync, SkarbDbContext db) => new
         {

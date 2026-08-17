@@ -29,7 +29,7 @@ public class MonobankProvider(
     /// <summary>The reported balance includes the credit limit; own funds is what users expect to see.</summary>
     public static decimal OwnFunds(long balanceMinor, decimal creditLimit) => FromMinor(balanceMinor) - creditLimit;
 
-    public async Task<SyncResult> SyncAsync(BankConnection connection, CancellationToken ct)
+    public async Task<SyncResult> SyncAsync(BankConnection connection, bool full, CancellationToken ct)
     {
         var settings = MonobankSettings.From(connection);
         if (string.IsNullOrWhiteSpace(settings.Token))
@@ -43,7 +43,7 @@ public class MonobankProvider(
         var newTx = 0;
         foreach (var account in accounts)
         {
-            var from = watermarks.TryGetValue(account.Id, out var last)
+            var from = !full && watermarks.TryGetValue(account.Id, out var last)
                 ? last.AddHours(-2)
                 : DateTime.UtcNow.AddDays(-options.Value.InitialHistoryDays);
             newTx += await FetchStatementsAsync(settings.Token, account, from, ct);

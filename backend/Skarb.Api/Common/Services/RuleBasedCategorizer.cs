@@ -45,9 +45,12 @@ public class RuleBasedCategorizer(SkarbDbContext db) : ICategorizer
     private List<CategoryRule>? _rules;
     private Dictionary<string, Guid>? _categoriesBySystemKey;
 
-    public async Task<Guid?> ResolveAsync(string description, string? counterParty, int? mcc, decimal amount, CancellationToken ct)
+    public async Task<Guid?> ResolveAsync(IncomingTransaction item, CancellationToken ct)
     {
-        var haystack = $"{description} {counterParty}";
+        var (description, counterParty, mcc, amount) = (item.Description, item.CounterParty, item.Mcc, item.Amount);
+        // Rules match against description, counterparty, the raw bank note and the type code,
+        // so "FEE" or "CARD-ATM" can be targeted even when the description is a merchant name.
+        var haystack = $"{description} {counterParty} {item.Note} {item.TypeCode}";
 
         _rules ??= await db.CategoryRules.AsNoTracking().OrderBy(r => r.Priority).ToListAsync(ct);
         foreach (var rule in _rules)

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { formatDistanceToNow, parseISO } from 'date-fns'
-import { Landmark, Plug, Upload, Trash2, RefreshCw, Webhook, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Landmark, Plug, Upload, Trash2, RefreshCw, Webhook, CheckCircle2, AlertCircle, History } from 'lucide-react'
 import { accountLabel, api, refreshAll, type Connection, type Meta } from '../../shared/api'
 import { Card, CardHeader, Modal, btnGhost, btnPrimary, errMsg, fieldLabelCls, inputCls } from '../../shared/ui'
 
@@ -139,6 +139,11 @@ function ConnectionRow({ c, onChanged }: { c: Connection; onChanged: () => void 
           <button title="Sync now" className="rounded-lg p-2 text-muted hover:bg-paper hover:text-ink"
             onClick={async () => { await api.syncOne(c.id); onChanged() }}>
             <RefreshCw size={16} />
+          </button>
+          <button title="Full re-sync: re-fetch the whole history and refresh existing transactions"
+            className="rounded-lg p-2 text-muted hover:bg-paper hover:text-ink"
+            onClick={async () => { await api.syncOne(c.id, true); onChanged() }}>
+            <History size={16} />
           </button>
           <button title="Remove connection" className="rounded-lg p-2 text-muted hover:bg-paper hover:text-danger"
             onClick={async () => {

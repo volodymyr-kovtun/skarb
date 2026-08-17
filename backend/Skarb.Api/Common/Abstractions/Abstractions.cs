@@ -16,7 +16,9 @@ public interface IBankProvider
 {
     /// <summary>Matches <see cref="BankConnection.Provider"/>.</summary>
     string Key { get; }
-    Task<SyncResult> SyncAsync(BankConnection connection, CancellationToken ct);
+    /// <param name="full">Ignore the incremental watermark and re-fetch the whole history window
+    /// (re-maps existing rows through the ingestor — used after mapping/categorization improvements).</param>
+    Task<SyncResult> SyncAsync(BankConnection connection, bool full, CancellationToken ct);
 }
 
 public sealed record SyncResult(int NewTransactions);
@@ -33,6 +35,8 @@ public sealed record IncomingTransaction(
     public string? CounterParty { get; init; }
     public string? CounterIban { get; init; }
     public int? Mcc { get; init; }
+    /// <summary>Bank-supplied transaction type (e.g. "CARD-ATM", "FEE"), when available. Rules can match on it.</summary>
+    public string? TypeCode { get; init; }
     public string? Note { get; init; }
 }
 
@@ -50,7 +54,7 @@ public interface ITransactionIngestor
 /// <summary>Assigns a category to an incoming transaction.</summary>
 public interface ICategorizer
 {
-    Task<Guid?> ResolveAsync(string description, string? counterParty, int? mcc, decimal amount, CancellationToken ct);
+    Task<Guid?> ResolveAsync(IncomingTransaction item, CancellationToken ct);
 }
 
 /// <summary>
@@ -74,7 +78,7 @@ public interface IExchangeRateService
 public interface ISyncService
 {
     IReadOnlyDictionary<Guid, string> Running { get; }
-    Task<List<Guid>> TriggerAsync(Guid? connectionId = null);
+    Task<List<Guid>> TriggerAsync(Guid? connectionId = null, bool full = false);
 }
 
 public sealed class SyncOptions

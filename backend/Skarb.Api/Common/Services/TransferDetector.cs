@@ -12,7 +12,7 @@ namespace Skarb.Api.Common.Services;
 ///    within 72 hours (classic A→B transfer where both banks are synced).
 /// Both legs get a shared TransferGroupId so they can be un-marked together.
 /// </summary>
-public class TransferDetector(SkarbDbContext db, IOptions<SyncOptions> options, ILogger<TransferDetector> logger) : ITransferDetector
+public partial class TransferDetector(SkarbDbContext db, IOptions<SyncOptions> options, ILogger<TransferDetector> logger) : ITransferDetector
 {
     public async Task<int> DetectAsync(CancellationToken ct)
     {
@@ -44,7 +44,28 @@ public class TransferDetector(SkarbDbContext db, IOptions<SyncOptions> options, 
             }
         }
 
-        // Signal 2: opposite legs on two different accounts, same currency, close in time.
+        // Signal 2: bank-issued shared reference on both legs (e.g. PKO currency exchange
+        // "FX18628069 EUR/PLN 4,26 DEBIT" + "... CREDIT") — catches cross-currency moves the
+        // amount-based pairing below can't.
+        var byRef = recent
+            .Where(t => t.TransferGroupId == null)
+            .Select(t => (Tx: t, Ref: SharedReference(t)))
+            .Where(x => x.Ref is not null)
+            .GroupBy(x => x.Ref!)
+            .Where(g => g.Select(x => x.Tx.AccountId).Distinct().Count() >= 2 &&
+                        g.Any(x => x.Tx.Amount < 0) && g.Any(x => x.Tx.Amount > 0));
+        foreach (var g in byRef)
+        {
+            var group = Guid.NewGuid();
+            foreach (var (tx, _) in g)
+            {
+                if (!tx.IsInternal) marked++;
+                tx.IsInternal = true;
+                tx.TransferGroupId = group;
+            }
+        }
+
+        // Signal 3: opposite legs on two different accounts, same currency, close in time.
         var unpaired = recent.Where(t => t.TransferGroupId == null).ToList();
         var candidates = unpaired.Where(t => t.Amount > 0).ToList();
 
@@ -78,4 +99,22 @@ public class TransferDetector(SkarbDbContext db, IOptions<SyncOptions> options, 
     }
 
     private static string Normalize(string iban) => iban.Replace(" ", "").ToUpperInvariant();
+
+    /// <summary>
+    /// A bank-issued token that appears on both legs of one operation: currently PKO's
+    /// "FX&lt;digits&gt;" exchange reference. Extend here as other banks reveal theirs.
+    /// </summary>
+    private static string? SharedReference(Domain.Transaction t)
+    {
+        foreach (var text in new[] { t.Description, t.Note })
+        {
+            if (string.IsNullOrEmpty(text)) continue;
+            var m = FxRef().Match(text);
+            if (m.Success) return m.Value.ToUpperInvariant();
+        }
+        return null;
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"\bFX\d{6,}\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex FxRef();
 }

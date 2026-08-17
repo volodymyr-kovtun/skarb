@@ -115,10 +115,13 @@ public class ConnectionEndpoints : IEndpointGroup
         });
 
         group.MapPost("/{id:guid}/enablebanking/authorize",
-            async (Guid id, EnableBankingAuthorizeRequest req, SkarbDbContext db, EnableBankingApiClient eb) =>
+            async (Guid id, EnableBankingAuthorizeRequest req, SkarbDbContext db, EnableBankingApiClient eb,
+                   ILogger<ConnectionEndpoints> log) =>
         {
             var conn = await db.Connections.FindAsync(id);
             if (conn is null) return Results.NotFound();
+            log.LogInformation("Enable Banking authorize: bank={Bank}/{Country} redirect={Redirect}",
+                req.AspspName, req.AspspCountry, req.RedirectUrl);
             var settings = EnableBankingSettings.From(conn);
             settings.AspspName = req.AspspName;
             settings.AspspCountry = req.AspspCountry;

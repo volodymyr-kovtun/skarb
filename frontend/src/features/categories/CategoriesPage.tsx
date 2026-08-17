@@ -96,6 +96,13 @@ function RulesCard() {
   const { data: rules } = useQuery({ queryKey: ['rules'], queryFn: api.rules })
   const [pattern, setPattern] = useState('')
   const [categoryId, setCategoryId] = useState('')
+  const [applyMsg, setApplyMsg] = useState('')
+
+  const applyNow = async () => {
+    const r = await api.applyRules()
+    setApplyMsg(`Categorized ${r.categorized} of ${r.scanned} uncategorized transaction${r.scanned === 1 ? '' : 's'}.`)
+    refreshAll(qc)
+  }
 
   const add = async () => {
     if (!pattern.trim() || !categoryId) return
@@ -106,12 +113,22 @@ function RulesCard() {
 
   return (
     <Card className="pb-4">
-      <CardHeader title="Auto-categorization rules" />
+      <CardHeader
+        title="Auto-categorization rules"
+        action={
+          <button onClick={applyNow} className="text-sm font-medium text-muted hover:text-ink">
+            Apply to uncategorized
+          </button>
+        }
+      />
       <div className="px-5 pt-1">
         <p className="mb-3 text-sm text-muted">
           When a new transaction's description contains a keyword, it gets the category automatically —
           e.g. <code className="rounded bg-paper px-1">ibkr</code> → 📈 Brokerage counts as investing.
+          Rules apply to new transactions as they arrive; use <em>Apply to uncategorized</em> to run them
+          over existing ones (it never overrides a category you set by hand).
         </p>
+        {applyMsg && <p className="mb-3 rounded-lg bg-income/5 px-3 py-2 text-sm text-income">{applyMsg}</p>}
         <div className="flex gap-2">
           <input className={inputCls} placeholder='Keyword, e.g. "zabka"' value={pattern} onChange={(e) => setPattern(e.target.value)} />
           <select className={inputCls + ' w-56'} value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>

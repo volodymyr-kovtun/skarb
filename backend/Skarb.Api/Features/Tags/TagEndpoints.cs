@@ -14,16 +14,14 @@ public class TagEndpoints : IEndpointGroup
     {
         var group = app.MapGroup("/api/tags");
 
-        group.MapGet("/", async (SkarbDbContext db) =>
-            await db.Tags.OrderBy(t => t.Name).Select(t => t.ToDto()).ToListAsync());
-
         group.MapPost("/", async (CreateTagRequest req, SkarbDbContext db) =>
         {
             var name = req.Name.Trim().ToLowerInvariant();
             if (name.Length == 0) return Results.BadRequest(new { error = "Name is required." });
             var existing = await db.Tags.FirstOrDefaultAsync(t => t.Name == name);
             if (existing is not null) return Results.Ok(existing.ToDto());
-            var tag = new Tag { Name = name, Color = req.Color ?? "#0EA5E9" };
+            var tag = new Tag { Name = name };
+            if (req.Color is not null) tag.Color = req.Color;
             db.Tags.Add(tag);
             await db.SaveChangesAsync();
             return Results.Created($"/api/tags/{tag.Id}", tag.ToDto());

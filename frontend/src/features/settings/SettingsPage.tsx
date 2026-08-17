@@ -3,8 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import { Landmark, Plug, Upload, Trash2, RefreshCw, Webhook, CheckCircle2, AlertCircle } from 'lucide-react'
-import { api, type Connection, type Meta } from '../../shared/api'
-import { Card, CardHeader, Modal, btnGhost, btnPrimary, inputCls } from '../../shared/ui'
+import { accountLabel, api, refreshAll, type Connection, type Meta } from '../../shared/api'
+import { Card, CardHeader, Modal, btnGhost, btnPrimary, errMsg, fieldLabelCls, inputCls } from '../../shared/ui'
 
 export default function SettingsPage() {
   const qc = useQueryClient()
@@ -19,8 +19,7 @@ export default function SettingsPage() {
   const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null)
   const completing = useRef(false)
 
-  const refresh = () => ['connections', 'meta', 'dashboard', 'transactions', 'sync-status']
-    .forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
+  const refresh = () => refreshAll(qc)
 
   // Enable Banking sends the user back here with ?code=...&state=<connectionId>
   useEffect(() => {
@@ -170,7 +169,7 @@ function MonobankModal({ onClose, onDone }: { onClose: () => void; onDone: () =>
       await api.connectMonobank(token)
       onDone()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed')
+      setError(errMsg(e, 'Failed'))
     } finally {
       setBusy(false)
     }
@@ -210,7 +209,7 @@ function WebhookModal({ connectionId, onClose }: { connectionId: string; onClose
       const r = await api.setMonobankWebhook(connectionId, baseUrl)
       setResult(r.webhookUrl)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed')
+      setError(errMsg(e, 'Failed'))
     }
   }
 
@@ -254,7 +253,7 @@ function EnableBankingModal({ onClose }: { onClose: () => void }) {
       setBanks(list)
       setStep(2)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed')
+      setError(errMsg(e, 'Failed'))
     } finally {
       setBusy(false)
     }
@@ -300,15 +299,15 @@ function EnableBankingModal({ onClose }: { onClose: () => void }) {
             then paste its credentials here. Full walkthrough: <span className="font-medium">docs/BANKS.md</span>.
           </p>
           <label className="text-sm">
-            <span className="mb-1 block text-xs font-medium text-muted">Connection name</span>
+            <span className={fieldLabelCls}>Connection name</span>
             <input className={inputCls} value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="PKO Bank Polski" />
           </label>
           <label className="text-sm">
-            <span className="mb-1 block text-xs font-medium text-muted">Application ID</span>
+            <span className={fieldLabelCls}>Application ID</span>
             <input className={inputCls} value={appId} onChange={(e) => setAppId(e.target.value)} placeholder="xxxxxxxx-xxxx-…" />
           </label>
           <label className="text-sm">
-            <span className="mb-1 block text-xs font-medium text-muted">RSA private key (PEM)</span>
+            <span className={fieldLabelCls}>RSA private key (PEM)</span>
             <textarea className={inputCls + ' h-28 font-mono text-xs'} value={pem} onChange={(e) => setPem(e.target.value)}
               placeholder={'-----BEGIN PRIVATE KEY-----\n…\n-----END PRIVATE KEY-----'} />
           </label>
@@ -413,7 +412,7 @@ function CsvModal({ meta, onClose, onDone }: { meta: Meta; onClose: () => void; 
       const err = r.errors.length ? ` (${r.errors.length} row(s) skipped with errors)` : ''
       onDone(`Imported ${r.imported} transaction(s), ${r.skipped} duplicate(s) skipped${err}.`)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Import failed')
+      setError(errMsg(e, 'Import failed'))
     } finally {
       setBusy(false)
     }
@@ -426,13 +425,13 @@ function CsvModal({ meta, onClose, onDone }: { meta: Meta; onClose: () => void; 
       <div className="flex flex-col gap-3">
         <div className="grid grid-cols-2 gap-3">
           <label className="text-sm">
-            <span className="mb-1 block text-xs font-medium text-muted">Into account</span>
+            <span className={fieldLabelCls}>Into account</span>
             <select className={inputCls} value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-              {meta.accounts.map((a) => <option key={a.id} value={a.id}>{a.bank ? `${a.bank} · ` : ''}{a.name} ({a.currency})</option>)}
+              {meta.accounts.map((a) => <option key={a.id} value={a.id}>{accountLabel(a)} ({a.currency})</option>)}
             </select>
           </label>
           <label className="text-sm">
-            <span className="mb-1 block text-xs font-medium text-muted">Format preset</span>
+            <span className={fieldLabelCls}>Format preset</span>
             <select className={inputCls} value={preset} onChange={(e) => pickPreset(e.target.value as keyof typeof CSV_PRESETS)}>
               {Object.entries(CSV_PRESETS).map(([k, p]) => <option key={k} value={k}>{p.label}</option>)}
             </select>

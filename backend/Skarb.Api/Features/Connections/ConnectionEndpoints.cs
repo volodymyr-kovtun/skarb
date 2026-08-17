@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Skarb.Api.Common.Abstractions;
 using Skarb.Api.Common.Domain;
@@ -26,14 +25,16 @@ public class ConnectionEndpoints : IEndpointGroup
 
         group.MapGet("/", async (SkarbDbContext db) =>
         {
-            var connections = await db.Connections.Include(c => c.Accounts).OrderBy(c => c.CreatedAt).ToListAsync();
-            return connections.Select(c =>
+            var connections = await db.Connections.OrderBy(c => c.CreatedAt)
+                .Select(c => new { Conn = c, AccountCount = c.Accounts.Count })
+                .ToListAsync();
+            return connections.Select(x =>
             {
                 DateTime? validUntil = null;
-                if (c.Provider == ProviderNames.EnableBanking)
-                    validUntil = EnableBankingSettings.From(c).ValidUntil;
-                return new ConnectionDto(c.Id, c.Provider, c.DisplayName, c.Status,
-                    c.LastSyncedAt, c.LastError, c.Accounts.Count, validUntil);
+                if (x.Conn.Provider == ProviderNames.EnableBanking)
+                    validUntil = EnableBankingSettings.From(x.Conn).ValidUntil;
+                return new ConnectionDto(x.Conn.Id, x.Conn.Provider, x.Conn.DisplayName, x.Conn.Status,
+                    x.Conn.LastSyncedAt, x.Conn.LastError, x.AccountCount, validUntil);
             });
         });
 
@@ -56,9 +57,9 @@ public class ConnectionEndpoints : IEndpointGroup
             {
                 Provider = ProviderNames.Monobank,
                 DisplayName = "Monobank",
-                SettingsJson = JsonSerializer.Serialize(new MonobankSettings { Token = req.Token.Trim() }),
-                Status = "linked",
+                Status = ConnectionStatuses.Linked,
             };
+            new MonobankSettings { Token = req.Token.Trim() }.SaveTo(conn);
             db.Connections.Add(conn);
             await db.SaveChangesAsync();
             await sync.TriggerAsync(conn.Id);
@@ -70,7 +71,7 @@ public class ConnectionEndpoints : IEndpointGroup
         {
             var conn = await db.Connections.FirstOrDefaultAsync(c => c.Id == id && c.Provider == ProviderNames.Monobank);
             if (conn is null) return Results.NotFound();
-            var settings = JsonSerializer.Deserialize<MonobankSettings>(conn.SettingsJson)!;
+            var settings = MonobankSettings.From(conn);
             var url = $"{req.PublicBaseUrl.TrimEnd('/')}/api/webhooks/monobank/{conn.Id}";
             await mono.SetWebhookAsync(settings.Token, url, CancellationToken.None);
             return Results.Ok(new { webhookUrl = url });
@@ -83,7 +84,6 @@ public class ConnectionEndpoints : IEndpointGroup
             {
                 Provider = ProviderNames.EnableBanking,
                 DisplayName = string.IsNullOrWhiteSpace(req.DisplayName) ? "Bank" : req.DisplayName,
-                Status = "pending",
             };
             new EnableBankingSettings
             {

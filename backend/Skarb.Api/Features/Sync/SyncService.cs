@@ -22,18 +22,42 @@ public class SyncService(IServiceScopeFactory scopeFactory, ILogger<SyncService>
     {
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SkarbDbContext>();
-        var query = db.Connections.Where(c => c.Status != "pending");
+        var query = db.Connections.Where(c => c.Status != ConnectionStatuses.Pending);
         if (connectionId is Guid id) query = query.Where(c => c.Id == id);
         var connections = await query.ToListAsync();
 
         var started = new List<Guid>();
+        var tasks = new List<Task>();
         foreach (var conn in connections)
         {
             if (!_running.TryAdd(conn.Id, conn.DisplayName)) continue;
             started.Add(conn.Id);
-            _ = Task.Run(() => RunOneAsync(conn.Id));
+            tasks.Add(Task.Run(() => RunOneAsync(conn.Id)));
         }
+
+        // Transfer detection needs both legs, so it runs once after the whole round —
+        // not per connection, where parallel runs would rescan and race each other.
+        if (tasks.Count > 0)
+            _ = Task.Run(async () =>
+            {
+                await Task.WhenAll(tasks);
+                await DetectTransfersAsync();
+            });
+
         return started;
+    }
+
+    private async Task DetectTransfersAsync()
+    {
+        try
+        {
+            using var scope = scopeFactory.CreateScope();
+            await scope.ServiceProvider.GetRequiredService<ITransferDetector>().DetectAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Transfer detection after sync round failed");
+        }
     }
 
     private async Task RunOneAsync(Guid connectionId)
@@ -41,7 +65,6 @@ public class SyncService(IServiceScopeFactory scopeFactory, ILogger<SyncService>
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SkarbDbContext>();
         var providers = scope.ServiceProvider.GetRequiredService<IEnumerable<IBankProvider>>();
-        var transferDetector = scope.ServiceProvider.GetRequiredService<ITransferDetector>();
 
         var conn = await db.Connections.FirstAsync(c => c.Id == connectionId);
         try
@@ -50,11 +73,10 @@ public class SyncService(IServiceScopeFactory scopeFactory, ILogger<SyncService>
                 ?? throw new InvalidOperationException($"No provider registered for '{conn.Provider}'");
 
             var result = await provider.SyncAsync(conn, CancellationToken.None);
-            await transferDetector.DetectAsync(CancellationToken.None);
 
             conn.LastSyncedAt = DateTime.UtcNow;
             conn.LastError = null;
-            conn.Status = "linked";
+            conn.Status = ConnectionStatuses.Linked;
             db.SyncLogs.Add(new SyncLog
             {
                 Provider = conn.Provider,
@@ -66,7 +88,7 @@ public class SyncService(IServiceScopeFactory scopeFactory, ILogger<SyncService>
         {
             logger.LogError(ex, "Sync failed for {Connection}", conn.DisplayName);
             conn.LastError = ex.Message;
-            conn.Status = "error";
+            conn.Status = ConnectionStatuses.Error;
             db.SyncLogs.Add(new SyncLog
             {
                 Provider = conn.Provider,

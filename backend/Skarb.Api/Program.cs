@@ -18,6 +18,7 @@ builder.Services.AddDbContext<SkarbDbContext>(o =>
 
 // --- options ---
 builder.Services.Configure<SyncOptions>(builder.Configuration.GetSection(SyncOptions.Section));
+builder.Services.Configure<FxOptions>(builder.Configuration.GetSection(FxOptions.Section));
 
 // --- core pipeline (SRP: ingest → categorize → detect transfers) ---
 builder.Services.AddHttpClient();

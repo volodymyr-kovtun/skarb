@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Skarb.Api.Common.Abstractions;
 using Skarb.Api.Common.Contracts;
 using Skarb.Api.Common.Domain;
@@ -15,9 +14,6 @@ public class AccountEndpoints : IEndpointGroup
     {
         var group = app.MapGroup("/api/accounts");
 
-        group.MapGet("/", async (SkarbDbContext db) =>
-            await db.Accounts.OrderBy(a => a.CreatedAt).Select(a => a.ToDto()).ToListAsync());
-
         group.MapPost("/", async (CreateAccountRequest req, SkarbDbContext db) =>
         {
             var account = new Account
@@ -27,8 +23,8 @@ public class AccountEndpoints : IEndpointGroup
                 Provider = ProviderNames.Manual,
                 Currency = req.Currency.ToUpperInvariant(),
                 Balance = req.Balance,
-                Color = req.Color ?? "#4F46E5",
             };
+            if (req.Color is not null) account.Color = req.Color;
             db.Accounts.Add(account);
             if (req.Balance != 0)
             {

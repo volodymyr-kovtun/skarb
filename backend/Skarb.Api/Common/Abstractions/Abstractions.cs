@@ -84,4 +84,14 @@ public sealed class SyncOptions
     public int InitialHistoryDays { get; set; } = 31;
     /// <summary>How far back the transfer detector looks for matching legs.</summary>
     public int TransferLookbackDays { get; set; } = 14;
+    /// <summary>Maximum time between the two legs of a detected internal transfer.</summary>
+    public int TransferPairWindowHours { get; set; } = 72;
+}
+
+public sealed class FxOptions
+{
+    public const string Section = "Fx";
+    /// <summary>Currency the dashboard reports in. Fallback rates assume PLN.</summary>
+    public string BaseCurrency { get; set; } = "PLN";
+    public int CacheHours { get; set; } = 12;
 }

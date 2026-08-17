@@ -22,6 +22,13 @@ public static class TransactionSources
     public const string Import = "import";
 }
 
+public static class ConnectionStatuses
+{
+    public const string Pending = "pending";
+    public const string Linked = "linked";
+    public const string Error = "error";
+}
+
 public class Account
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -79,6 +86,8 @@ public class Category
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = "";
+    /// <summary>Stable identifier for seeded categories (MCC mapping targets this, so renaming is safe).</summary>
+    public string? SystemKey { get; set; }
     public string Emoji { get; set; } = "🏷️";
     public string Color { get; set; } = "#64748B";
     public string Kind { get; set; } = CategoryKinds.Expense; // expense | income | investment
@@ -101,7 +110,7 @@ public class BankConnection
     public string DisplayName { get; set; } = "";
     /// <summary>Provider-specific settings (token, keys, session) as JSON.</summary>
     public string SettingsJson { get; set; } = "{}";
-    public string Status { get; set; } = "pending"; // pending | linked | error
+    public string Status { get; set; } = ConnectionStatuses.Pending;
     public DateTime? LastSyncedAt { get; set; }
     public string? LastError { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

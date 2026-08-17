@@ -20,7 +20,8 @@ public class MonobankWebhookEndpoints : IEndpointGroup
 
         app.MapPost("/api/webhooks/monobank/{connectionId:guid}",
             async (Guid connectionId, HttpRequest request, SkarbDbContext db,
-                   ITransactionIngestor ingestor, ITransferDetector transferDetector) =>
+                   ITransactionIngestor ingestor, IServiceScopeFactory scopeFactory,
+                   ILoggerFactory loggerFactory) =>
         {
             using var doc = await JsonDocument.ParseAsync(request.Body);
             if (!doc.RootElement.TryGetProperty("data", out var data)) return Results.Ok();
@@ -36,11 +37,25 @@ public class MonobankWebhookEndpoints : IEndpointGroup
 
             if (item.TryGetProperty("balance", out var bal))
             {
-                account.Balance = bal.GetInt64() / 100m - account.CreditLimit;
+                account.Balance = MonobankProvider.OwnFunds(bal.GetInt64(), account.CreditLimit);
                 await db.SaveChangesAsync();
             }
 
-            await transferDetector.DetectAsync(CancellationToken.None);
+            // Detection scans a multi-day window — run it after the response so
+            // Monobank gets its 200 within the 5-second delivery deadline.
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var scope = scopeFactory.CreateScope();
+                    await scope.ServiceProvider.GetRequiredService<ITransferDetector>().DetectAsync(CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    loggerFactory.CreateLogger("MonobankWebhook").LogError(ex, "Transfer detection after webhook failed");
+                }
+            });
+
             return Results.Ok();
         });
     }

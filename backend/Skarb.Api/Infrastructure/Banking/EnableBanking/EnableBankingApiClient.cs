@@ -63,21 +63,13 @@ public class EnableBankingApiClient(IHttpClientFactory httpFactory)
     private async Task<JsonDocument> GetAsync(EnableBankingSettings settings, string path, CancellationToken ct)
     {
         using var resp = await CreateClient(settings).GetAsync(path, ct);
-        return await ReadAsync(resp, path, ct);
+        return await BankingHttp.ReadJsonAsync(resp, $"Enable Banking {path}", ct);
     }
 
     private async Task<JsonDocument> PostAsync(EnableBankingSettings settings, string path, object body, CancellationToken ct)
     {
         using var resp = await CreateClient(settings).PostAsJsonAsync(path, body, ct);
-        return await ReadAsync(resp, path, ct);
-    }
-
-    private static async Task<JsonDocument> ReadAsync(HttpResponseMessage resp, string path, CancellationToken ct)
-    {
-        var text = await resp.Content.ReadAsStringAsync(ct);
-        if (!resp.IsSuccessStatusCode)
-            throw new InvalidOperationException($"Enable Banking {path} failed: {(int)resp.StatusCode} {text}");
-        return JsonDocument.Parse(text);
+        return await BankingHttp.ReadJsonAsync(resp, $"Enable Banking {path}", ct);
     }
 
     private HttpClient CreateClient(EnableBankingSettings settings)
@@ -87,9 +79,23 @@ public class EnableBankingApiClient(IHttpClientFactory httpFactory)
         var http = httpFactory.CreateClient("enablebanking");
         http.BaseAddress = new Uri(BaseUrl);
         http.DefaultRequestHeaders.Remove("Authorization");
-        http.DefaultRequestHeaders.Add("Authorization",
-            $"Bearer {CreateJwt(settings.ApplicationId, settings.PrivateKeyPem)}");
+        http.DefaultRequestHeaders.Add("Authorization", $"Bearer {GetJwt(settings)}");
         return http;
+    }
+
+    // JWTs are valid for an hour — signing one RSA token per HTTP request (each page of a
+    // paginated fetch) is pure waste, so cache per application until shortly before expiry.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (string Jwt, DateTimeOffset ExpiresAt)> JwtCache = new();
+
+    private static string GetJwt(EnableBankingSettings settings)
+    {
+        if (JwtCache.TryGetValue(settings.ApplicationId, out var cached) &&
+            cached.ExpiresAt > DateTimeOffset.UtcNow.AddMinutes(5))
+            return cached.Jwt;
+
+        var jwt = CreateJwt(settings.ApplicationId, settings.PrivateKeyPem);
+        JwtCache[settings.ApplicationId] = (jwt, DateTimeOffset.UtcNow.AddHours(1));
+        return jwt;
     }
 
     /// <summary>RS256 JWT per Enable Banking docs: kid = application id, iss/aud fixed, 1h lifetime.</summary>

@@ -18,13 +18,7 @@ public class CsvImportEndpoints : IEndpointGroup
             var account = await db.Accounts.FindAsync(req.AccountId);
             if (account is null) return Results.BadRequest(new { error = "Account not found" });
 
-            var mapping = new CsvMapping(
-                req.DateColumn, req.AmountColumn, req.DescriptionColumn, req.CurrencyColumn,
-                req.DateFormat ?? "", req.DecimalSeparator ?? ".",
-                string.IsNullOrEmpty(req.Delimiter) ? ',' : req.Delimiter[0],
-                req.HasHeader, req.InvertAmount);
-
-            var result = await csv.ImportAsync(account, req.Content, mapping, CancellationToken.None);
+            var result = await csv.ImportAsync(account, req, CancellationToken.None);
             await transferDetector.DetectAsync(CancellationToken.None);
             return Results.Ok(result);
         });

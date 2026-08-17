@@ -38,10 +38,10 @@ public class CategoryEndpoints : IEndpointGroup
             var cat = new Category
             {
                 Name = req.Name.Trim(),
-                Emoji = string.IsNullOrWhiteSpace(req.Emoji) ? "🏷️" : req.Emoji.Trim(),
                 Color = req.Color,
                 Kind = req.Kind,
             };
+            if (!string.IsNullOrWhiteSpace(req.Emoji)) cat.Emoji = req.Emoji.Trim();
             db.Categories.Add(cat);
             await db.SaveChangesAsync();
             return Results.Created($"/api/categories/{cat.Id}", cat.ToDto());

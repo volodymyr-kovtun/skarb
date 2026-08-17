@@ -126,11 +126,26 @@ export const api = {
   }) => post<{ imported: number; skipped: number; errors: string[] }>('/api/import/csv', body),
 }
 
+// Intl.NumberFormat construction is expensive and fmtMoney runs per row and per
+// chart-tooltip render — cache formatters per currency/precision.
+const formatters = new Map<string, Intl.NumberFormat>()
+
 export function fmtMoney(amount: number, currency: string, opts?: { sign?: boolean; decimals?: number }) {
-  const f = new Intl.NumberFormat('en-US', {
-    style: 'currency', currency, currencyDisplay: 'narrowSymbol',
-    minimumFractionDigits: opts?.decimals ?? 2, maximumFractionDigits: opts?.decimals ?? 2,
-  }).format(Math.abs(amount))
+  const decimals = opts?.decimals ?? 2
+  const key = `${currency}|${decimals}`
+  let f = formatters.get(key)
+  if (!f) {
+    f = new Intl.NumberFormat('en-US', {
+      style: 'currency', currency, currencyDisplay: 'narrowSymbol',
+      minimumFractionDigits: decimals, maximumFractionDigits: decimals,
+    })
+    formatters.set(key, f)
+  }
   const sign = amount < 0 ? '−' : opts?.sign ? '+' : ''
-  return sign + f
+  return sign + f.format(Math.abs(amount))
 }
+
+export const accountLabel = (a: Account) => (a.bank ? `${a.bank} · ` : '') + a.name
+
+/** Every mutation invalidates everything — the app is small and the query graph isn't worth hand-maintaining. */
+export const refreshAll = (qc: import('@tanstack/react-query').QueryClient) => qc.invalidateQueries()

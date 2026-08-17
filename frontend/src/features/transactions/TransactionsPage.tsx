@@ -1,11 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
 import { Plus, Search, X } from 'lucide-react'
-import { api, type Meta, type Tx } from '../../shared/api'
-import { Card, Modal, TxRow, btnGhost, btnPrimary, dayLabel, inputCls } from '../../shared/ui'
-
-const invalidateAll = ['transactions', 'dashboard', 'meta']
+import { accountLabel, api, refreshAll, type Meta, type Tx } from '../../shared/api'
+import { Card, Modal, ModalActions, TxRow, btnGhost, btnPrimary, dayLabel, errMsg, fieldLabelCls, inputCls } from '../../shared/ui'
 
 const SPECIAL_FILTERS = {
   uncategorized: '· Uncategorized',
@@ -18,22 +16,30 @@ export default function TransactionsPage() {
   const { data: meta } = useQuery({ queryKey: ['meta'], queryFn: api.meta })
 
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [accountId, setAccountId] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [page, setPage] = useState(1)
   const [editing, setEditing] = useState<Tx | null>(null)
   const [adding, setAdding] = useState(false)
 
+  // Debounce typing so we don't fire a search request per keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(1) }, 300)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search])
+
   const params = useMemo(() => {
     const p: Record<string, string> = { page: String(page), pageSize: '50' }
-    if (search) p.search = search
+    if (debouncedSearch) p.search = debouncedSearch
     if (accountId) p.accountId = accountId
     if (categoryId === 'uncategorized') p.uncategorized = 'true'
     else if (categoryId === 'internal') p.internalOnly = 'true'
     else if (categoryId === 'investments') p.investmentsOnly = 'true'
     else if (categoryId) p.categoryId = categoryId
     return p
-  }, [search, accountId, categoryId, page])
+  }, [debouncedSearch, accountId, categoryId, page])
 
   const { data } = useQuery({
     queryKey: ['transactions', params],
@@ -52,7 +58,7 @@ export default function TransactionsPage() {
     return out
   }, [data])
 
-  const refresh = () => invalidateAll.forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
+  const refresh = () => refreshAll(qc)
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1
 
   return (
@@ -73,7 +79,7 @@ export default function TransactionsPage() {
             className="h-full w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-faint"
             placeholder="Search description, merchant or note…"
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+            onChange={(e) => setSearch(e.target.value)}
           />
           {search && (
             <button onClick={() => setSearch('')} aria-label="Clear search" className="shrink-0 text-faint hover:text-ink">
@@ -87,7 +93,7 @@ export default function TransactionsPage() {
           onChange={(e) => { setAccountId(e.target.value); setPage(1) }}
         >
           <option value="">All accounts</option>
-          {meta?.accounts.map((a) => <option key={a.id} value={a.id}>{a.bank ? `${a.bank} · ` : ''}{a.name}</option>)}
+          {meta?.accounts.map((a) => <option key={a.id} value={a.id}>{accountLabel(a)}</option>)}
         </select>
         <select
           className="h-10 w-48 shrink-0 rounded-xl border-r-8 border-transparent bg-paper px-3 text-sm font-medium text-ink outline-none"
@@ -135,6 +141,7 @@ export default function TransactionsPage() {
 
 function TxForm({ meta, tx, onClose, onSaved }:
   { meta: Meta; tx?: Tx; onClose: () => void; onSaved: () => void }) {
+  const qc = useQueryClient()
   const isEdit = !!tx
   const [kind, setKind] = useState<'expense' | 'income'>(tx ? (tx.amount > 0 ? 'income' : 'expense') : 'expense')
   const [accountId, setAccountId] = useState(tx?.accountId ?? meta.accounts[0]?.id ?? '')
@@ -189,7 +196,7 @@ function TxForm({ meta, tx, onClose, onSaved }:
       }
       onSaved()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong')
+      setError(errMsg(e))
     } finally {
       setBusy(false)
     }
@@ -205,7 +212,9 @@ function TxForm({ meta, tx, onClose, onSaved }:
     const name = newTag.trim().toLowerCase()
     if (!name) return
     const tag = await api.createTag({ name })
-    if (!meta.tags.some((t) => t.id === tag.id)) meta.tags.push(tag)
+    // Update the cached meta immutably instead of mutating the cache object.
+    qc.setQueryData<Meta>(['meta'], (old) =>
+      old && !old.tags.some((t) => t.id === tag.id) ? { ...old, tags: [...old.tags, tag] } : old)
     setTagIds((ids) => (ids.includes(tag.id) ? ids : [...ids, tag.id]))
     setNewTag('')
   }
@@ -227,31 +236,31 @@ function TxForm({ meta, tx, onClose, onSaved }:
 
         <div className="grid grid-cols-2 gap-3">
           <label className="text-sm">
-            <span className="mb-1 block text-xs font-medium text-muted">Amount {account ? `(${account.currency})` : ''}</span>
+            <span className={fieldLabelCls}>Amount {account ? `(${account.currency})` : ''}</span>
             <input className={inputCls + ' tnum'} type="number" min="0" step="0.01" value={amount}
               onChange={(e) => setAmount(e.target.value)} placeholder="0.00" autoFocus
               disabled={isEdit && tx!.source !== 'manual'} />
           </label>
           <label className="text-sm">
-            <span className="mb-1 block text-xs font-medium text-muted">Date</span>
+            <span className={fieldLabelCls}>Date</span>
             <input className={inputCls} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </label>
         </div>
 
         <label className="text-sm">
-          <span className="mb-1 block text-xs font-medium text-muted">Description</span>
+          <span className={fieldLabelCls}>Description</span>
           <input className={inputCls} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Where did the money go?" />
         </label>
 
         <div className="grid grid-cols-2 gap-3">
           <label className="text-sm">
-            <span className="mb-1 block text-xs font-medium text-muted">Account</span>
+            <span className={fieldLabelCls}>Account</span>
             <select className={inputCls} value={accountId} onChange={(e) => setAccountId(e.target.value)} disabled={isEdit}>
               {meta.accounts.map((a) => <option key={a.id} value={a.id}>{a.bank ? `${a.bank} · ` : ''}{a.name}</option>)}
             </select>
           </label>
           <label className="text-sm">
-            <span className="mb-1 block text-xs font-medium text-muted">Category</span>
+            <span className={fieldLabelCls}>Category</span>
             <select className={inputCls} value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
               <option value="">Uncategorized</option>
               {cats.map((c) => <option key={c.id} value={c.id}>{c.emoji} {c.name}{c.kind === 'investment' ? ' (investment)' : ''}</option>)}
@@ -260,7 +269,7 @@ function TxForm({ meta, tx, onClose, onSaved }:
         </div>
 
         <div className="text-sm">
-          <span className="mb-1 block text-xs font-medium text-muted">Tags</span>
+          <span className={fieldLabelCls}>Tags</span>
           <div className="flex flex-wrap items-center gap-1.5">
             {meta.tags.map((t) => {
               const on = tagIds.includes(t.id)
@@ -286,7 +295,7 @@ function TxForm({ meta, tx, onClose, onSaved }:
         </div>
 
         <label className="text-sm">
-          <span className="mb-1 block text-xs font-medium text-muted">Note</span>
+          <span className={fieldLabelCls}>Note</span>
           <input className={inputCls} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional" />
         </label>
 
@@ -305,17 +314,8 @@ function TxForm({ meta, tx, onClose, onSaved }:
 
         {error && <p className="text-sm text-danger">{error}</p>}
 
-        <div className="mt-2 flex items-center justify-between">
-          {isEdit ? (
-            <button className="text-sm font-medium text-danger hover:underline" onClick={remove}>Delete</button>
-          ) : <span />}
-          <div className="flex gap-2">
-            <button className={btnGhost} onClick={onClose}>Cancel</button>
-            <button className={btnPrimary} onClick={save} disabled={busy}>
-              {busy ? 'Saving…' : isEdit ? 'Save changes' : 'Add transaction'}
-            </button>
-          </div>
-        </div>
+        <ModalActions busy={busy} saveLabel={isEdit ? 'Save changes' : 'Add transaction'}
+          onCancel={onClose} onSave={save} onDelete={isEdit ? remove : undefined} />
       </div>
     </Modal>
   )

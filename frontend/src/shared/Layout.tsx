@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { LayoutGrid, ArrowLeftRight, Wallet, Shapes, Settings, RefreshCw } from 'lucide-react'
 import { api } from './api'
+import { btnGhost } from './ui'
 
 const nav = [
   { to: '/', label: 'Overview', icon: LayoutGrid },
@@ -58,7 +59,7 @@ export default function Layout() {
           <button
             onClick={syncNow}
             disabled={syncing}
-            className="flex items-center justify-center gap-2 rounded-xl border border-line px-3 py-2 text-sm font-medium text-muted transition-colors hover:border-ink hover:text-ink disabled:opacity-60"
+            className={`${btnGhost} flex items-center justify-center gap-2`}
           >
             <RefreshCw size={15} className={syncing ? 'animate-spin' : ''} />
             {syncing ? 'Syncing…' : 'Sync now'}

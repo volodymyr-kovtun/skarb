@@ -3,6 +3,7 @@ using Skarb.Api.Common.Abstractions;
 using Skarb.Api.Common.Contracts;
 using Skarb.Api.Common.Domain;
 using Skarb.Api.Common.Persistence;
+using Skarb.Api.Common.Services;
 
 namespace Skarb.Api.Features.Transactions;
 
@@ -74,8 +75,8 @@ public class TransactionEndpoints : IEndpointGroup
                 tx.Tags = await db.Tags.Where(t => req.TagIds.Contains(t.Id)).ToListAsync();
 
             db.Transactions.Add(tx);
-            if (account.Provider == ProviderNames.Manual) account.Balance += req.Amount;
             await db.SaveChangesAsync();
+            await ManualAccountBalance.RecomputeAsync(db, account);
 
             await db.Entry(tx).Reference(t => t.Account).LoadAsync();
             await db.Entry(tx).Reference(t => t.Category).LoadAsync();
@@ -94,10 +95,7 @@ public class TransactionEndpoints : IEndpointGroup
             if (req.IsExcluded is bool excl) tx.IsExcluded = excl;
             if (req.OccurredAt is DateTime occ) tx.OccurredAt = DateTime.SpecifyKind(occ, DateTimeKind.Utc);
             if (req.Amount is decimal amount && tx.Source == TransactionSources.Manual)
-            {
-                if (tx.Account is { Provider: ProviderNames.Manual } acc) acc.Balance += amount - tx.Amount;
                 tx.Amount = amount;
-            }
             if (req.CategorySet) tx.CategoryId = req.CategoryId;
             if (req.TagIds is not null)
                 tx.Tags = await db.Tags.Where(t => req.TagIds.Contains(t.Id)).ToListAsync();
@@ -121,6 +119,7 @@ public class TransactionEndpoints : IEndpointGroup
             }
 
             await db.SaveChangesAsync();
+            if (tx.Account is not null) await ManualAccountBalance.RecomputeAsync(db, tx.Account);
             await db.Entry(tx).Reference(t => t.Category).LoadAsync();
             return Results.Ok(tx.ToDto());
         });
@@ -129,9 +128,9 @@ public class TransactionEndpoints : IEndpointGroup
         {
             var tx = await db.Transactions.Include(t => t.Account).FirstOrDefaultAsync(t => t.Id == id);
             if (tx is null) return Results.NotFound();
-            if (tx.Account is { Provider: ProviderNames.Manual } acc) acc.Balance -= tx.Amount;
             db.Transactions.Remove(tx);
             await db.SaveChangesAsync();
+            if (tx.Account is not null) await ManualAccountBalance.RecomputeAsync(db, tx.Account);
             return Results.NoContent();
         });
     }

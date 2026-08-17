@@ -1,10 +1,8 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Landmark } from 'lucide-react'
-import { api, fmtMoney, type Account } from '../../shared/api'
-import { Card, Modal, btnGhost, btnPrimary, inputCls } from '../../shared/ui'
-
-const COLORS = ['#4F46E5', '#0B5FFF', '#059669', '#C29B3C', '#DB2777', '#0891B2', '#131B2E', '#EA580C']
+import { api, fmtMoney, refreshAll, type Account } from '../../shared/api'
+import { ACCOUNT_COLORS, Card, ColorPicker, Modal, ModalActions, btnPrimary, errMsg, fieldLabelCls, inputCls } from '../../shared/ui'
 
 const providerLabel: Record<string, string> = {
   manual: 'Manual',
@@ -17,7 +15,7 @@ export default function AccountsPage() {
   const { data: meta } = useQuery({ queryKey: ['meta'], queryFn: api.meta })
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<Account | null>(null)
-  const refresh = () => ['meta', 'dashboard', 'transactions'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
+  const refresh = () => refreshAll(qc)
 
   const accounts = meta?.accounts ?? []
   const active = accounts.filter((a) => !a.isArchived)
@@ -91,7 +89,7 @@ function AccountForm({ account, onClose, onSaved }:
   const [bank, setBank] = useState(account?.bank ?? '')
   const [currency, setCurrency] = useState(account?.currency ?? 'PLN')
   const [balance, setBalance] = useState('0')
-  const [color, setColor] = useState(account?.color ?? COLORS[0])
+  const [color, setColor] = useState(account?.color ?? ACCOUNT_COLORS[0])
   const [archived, setArchived] = useState(account?.isArchived ?? false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -108,7 +106,7 @@ function AccountForm({ account, onClose, onSaved }:
       }
       onSaved()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong')
+      setError(errMsg(e))
     } finally {
       setBusy(false)
     }
@@ -124,25 +122,25 @@ function AccountForm({ account, onClose, onSaved }:
     <Modal title={isEdit ? 'Edit account' : 'Add manual account'} onClose={onClose}>
       <div className="flex flex-col gap-3">
         <label className="text-sm">
-          <span className="mb-1 block text-xs font-medium text-muted">Name</span>
+          <span className={fieldLabelCls}>Name</span>
           <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="Cash wallet" autoFocus />
         </label>
 
         {!isEdit && (
           <>
             <label className="text-sm">
-              <span className="mb-1 block text-xs font-medium text-muted">Bank / institution (optional)</span>
+              <span className={fieldLabelCls}>Bank / institution (optional)</span>
               <input className={inputCls} value={bank} onChange={(e) => setBank(e.target.value)} placeholder="ZEN, cash, …" />
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="text-sm">
-                <span className="mb-1 block text-xs font-medium text-muted">Currency</span>
+                <span className={fieldLabelCls}>Currency</span>
                 <select className={inputCls} value={currency} onChange={(e) => setCurrency(e.target.value)}>
                   {['PLN', 'UAH', 'EUR', 'USD', 'GBP', 'CZK', 'CHF'].map((c) => <option key={c}>{c}</option>)}
                 </select>
               </label>
               <label className="text-sm">
-                <span className="mb-1 block text-xs font-medium text-muted">Current balance</span>
+                <span className={fieldLabelCls}>Current balance</span>
                 <input className={inputCls + ' tnum'} type="number" step="0.01" value={balance} onChange={(e) => setBalance(e.target.value)} />
               </label>
             </div>
@@ -150,14 +148,8 @@ function AccountForm({ account, onClose, onSaved }:
         )}
 
         <div className="text-sm">
-          <span className="mb-1 block text-xs font-medium text-muted">Color</span>
-          <div className="flex gap-2">
-            {COLORS.map((c) => (
-              <button key={c} onClick={() => setColor(c)} aria-label={`Color ${c}`}
-                className={`h-7 w-7 rounded-full transition-transform ${color === c ? 'scale-110 ring-2 ring-ink ring-offset-2' : ''}`}
-                style={{ background: c }} />
-            ))}
-          </div>
+          <span className={fieldLabelCls}>Color</span>
+          <ColorPicker colors={ACCOUNT_COLORS} value={color} onChange={setColor} />
         </div>
 
         {isEdit && (
@@ -169,15 +161,7 @@ function AccountForm({ account, onClose, onSaved }:
 
         {error && <p className="text-sm text-danger">{error}</p>}
 
-        <div className="mt-2 flex items-center justify-between">
-          {isEdit ? (
-            <button className="text-sm font-medium text-danger hover:underline" onClick={remove}>Delete</button>
-          ) : <span />}
-          <div className="flex gap-2">
-            <button className={btnGhost} onClick={onClose}>Cancel</button>
-            <button className={btnPrimary} onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
-          </div>
-        </div>
+        <ModalActions busy={busy} onCancel={onClose} onSave={save} onDelete={isEdit ? remove : undefined} />
       </div>
     </Modal>
   )

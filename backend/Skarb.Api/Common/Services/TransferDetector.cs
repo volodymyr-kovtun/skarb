@@ -14,10 +14,9 @@ namespace Skarb.Api.Common.Services;
 /// </summary>
 public class TransferDetector(SkarbDbContext db, IOptions<SyncOptions> options, ILogger<TransferDetector> logger) : ITransferDetector
 {
-    private static readonly TimeSpan PairWindow = TimeSpan.FromHours(72);
-
     public async Task<int> DetectAsync(CancellationToken ct)
     {
+        var pairWindow = TimeSpan.FromHours(options.Value.TransferPairWindowHours);
         var cutoff = DateTime.UtcNow.AddDays(-options.Value.TransferLookbackDays);
         var marked = 0;
 
@@ -51,14 +50,12 @@ public class TransferDetector(SkarbDbContext db, IOptions<SyncOptions> options, 
 
         foreach (var outgoing in unpaired.Where(t => t.Amount < 0))
         {
-            if (outgoing.TransferGroupId != null) continue;
-
             var match = candidates
                 .Where(c => c.TransferGroupId == null &&
                             c.AccountId != outgoing.AccountId &&
                             c.Currency == outgoing.Currency &&
                             c.Amount == -outgoing.Amount &&
-                            (c.OccurredAt - outgoing.OccurredAt).Duration() <= PairWindow)
+                            (c.OccurredAt - outgoing.OccurredAt).Duration() <= pairWindow)
                 .OrderBy(c => (c.OccurredAt - outgoing.OccurredAt).Duration())
                 .FirstOrDefault();
             if (match is null) continue;

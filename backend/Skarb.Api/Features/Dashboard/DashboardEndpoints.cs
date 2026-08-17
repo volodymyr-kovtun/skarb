@@ -15,7 +15,10 @@ public class DashboardEndpoints : IEndpointGroup
             var now = DateTime.UtcNow;
             var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
             var prevMonthStart = monthStart.AddMonths(-1);
-            var windowStart = monthStart.AddMonths(-(months - 1));
+            // The window always covers the previous month too, so the summary tiles
+            // can read from the same per-month totals as the chart.
+            var windowStart = monthStart.AddMonths(-Math.Max(months - 1, 1));
+            var chartStart = monthStart.AddMonths(-(months - 1));
 
             // Net worth across accounts, converted to base currency.
             var accounts = await db.Accounts.Where(a => !a.IsArchived).OrderBy(a => a.CreatedAt).ToListAsync();
@@ -47,29 +50,31 @@ public class DashboardEndpoints : IEndpointGroup
                 })
                 .ToListAsync();
 
-            async Task<(decimal income, decimal expense, decimal invested)> TotalsFor(int year, int month)
+            // One conversion pass per month in the window; tiles and chart read the same numbers.
+            var totalsByMonth = new Dictionary<DateTime, (decimal Income, decimal Expense, decimal Invested)>();
+            for (var d = windowStart; d <= monthStart; d = d.AddMonths(1))
             {
                 decimal income = 0, expense = 0, invested = 0;
-                foreach (var row in flowRows.Where(r => r.Year == year && r.Month == month))
+                foreach (var row in flowRows.Where(r => r.Year == d.Year && r.Month == d.Month))
                 {
                     var v = await fx.ToBaseAsync(Math.Abs(row.Sum), row.Currency);
                     if (row.IsInvestment) invested += row.IsIncome ? -v : v; // withdrawals reduce invested
                     else if (row.IsIncome) income += v;
                     else expense += v;
                 }
-                return (Math.Round(income, 2), Math.Round(expense, 2), Math.Round(invested, 2));
+                totalsByMonth[d] = (Math.Round(income, 2), Math.Round(expense, 2), Math.Round(invested, 2));
             }
 
             var cashflow = new List<object>();
             for (var m = 0; m < months; m++)
             {
-                var d = windowStart.AddMonths(m);
-                var (income, expense, invested) = await TotalsFor(d.Year, d.Month);
-                cashflow.Add(new { month = d.ToString("yyyy-MM"), income, expense, invested });
+                var d = chartStart.AddMonths(m);
+                var t = totalsByMonth.GetValueOrDefault(d);
+                cashflow.Add(new { month = d.ToString("yyyy-MM"), income = t.Income, expense = t.Expense, invested = t.Invested });
             }
 
-            var (curIncome, curExpense, curInvested) = await TotalsFor(monthStart.Year, monthStart.Month);
-            var (prevIncome, prevExpense, prevInvested) = await TotalsFor(prevMonthStart.Year, prevMonthStart.Month);
+            var (curIncome, curExpense, curInvested) = totalsByMonth[monthStart];
+            var (prevIncome, prevExpense, prevInvested) = totalsByMonth[prevMonthStart];
 
             // All-time net contributions to investment-kind categories.
             var investedRows = await db.Transactions
@@ -98,13 +103,17 @@ public class DashboardEndpoints : IEndpointGroup
                 byCategory[key] = byCategory.GetValueOrDefault(key) + v;
             }
             var spendingByCategory = byCategory
-                .Select(kv => new
+                .Select(kv =>
                 {
-                    categoryId = kv.Key == Guid.Empty ? (Guid?)null : kv.Key,
-                    name = categories.TryGetValue(kv.Key, out var c) ? c.Name : "Uncategorized",
-                    emoji = categories.TryGetValue(kv.Key, out var c2) ? c2.Emoji : "❔",
-                    color = categories.TryGetValue(kv.Key, out var c3) ? c3.Color : "#CBD5E1",
-                    amount = Math.Round(kv.Value, 2),
+                    categories.TryGetValue(kv.Key, out var cat);
+                    return new
+                    {
+                        categoryId = kv.Key == Guid.Empty ? (Guid?)null : kv.Key,
+                        name = cat?.Name ?? "Uncategorized",
+                        emoji = cat?.Emoji ?? "❔",
+                        color = cat?.Color ?? "#CBD5E1",
+                        amount = Math.Round(kv.Value, 2),
+                    };
                 })
                 .OrderByDescending(x => x.amount)
                 .ToList();

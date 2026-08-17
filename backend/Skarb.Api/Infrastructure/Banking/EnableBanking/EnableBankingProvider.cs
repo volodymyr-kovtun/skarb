@@ -1,12 +1,11 @@
 using System.Globalization;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Skarb.Api.Common.Abstractions;
 using Skarb.Api.Common.Domain;
 using Skarb.Api.Common.Persistence;
+using Skarb.Api.Common.Services;
 
 namespace Skarb.Api.Infrastructure.Banking.EnableBanking;
 
@@ -33,12 +32,13 @@ public class EnableBankingProvider(
         var accounts = await db.Accounts
             .Where(a => a.ConnectionId == connection.Id && !a.IsArchived)
             .ToListAsync(ct);
+        var watermarks = await db.LastSyncedByAccountAsync(accounts.Select(a => a.Id).ToList(), ct);
 
         var newTx = 0;
         foreach (var account in accounts)
         {
             await RefreshBalanceAsync(settings, account, ct);
-            newTx += await FetchTransactionsAsync(settings, account, ct);
+            newTx += await FetchTransactionsAsync(settings, account, watermarks.GetValueOrDefault(account.Id), ct);
         }
 
         await db.SaveChangesAsync(ct);
@@ -88,7 +88,7 @@ public class EnableBankingProvider(
         }
 
         settings.SaveTo(connection);
-        connection.Status = "linked";
+        connection.Status = ConnectionStatuses.Linked;
         await db.SaveChangesAsync(ct);
     }
 
@@ -111,11 +111,8 @@ public class EnableBankingProvider(
         }
     }
 
-    private async Task<int> FetchTransactionsAsync(EnableBankingSettings settings, Account account, CancellationToken ct)
+    private async Task<int> FetchTransactionsAsync(EnableBankingSettings settings, Account account, DateTime? lastKnown, CancellationToken ct)
     {
-        var lastKnown = await db.Transactions
-            .Where(t => t.AccountId == account.Id && t.ExternalId != null)
-            .MaxAsync(t => (DateTime?)t.OccurredAt, ct);
         var dateFrom = (lastKnown?.AddDays(-3) ?? DateTime.UtcNow.AddDays(-Math.Max(options.Value.InitialHistoryDays, 90)))
             .ToString("yyyy-MM-dd");
 
@@ -162,7 +159,7 @@ public class EnableBankingProvider(
         var externalId = tx.TryGetProperty("entry_reference", out var er) && er.ValueKind == JsonValueKind.String &&
                          !string.IsNullOrWhiteSpace(er.GetString())
             ? er.GetString()!
-            : StableHash($"{occurredAt:yyyy-MM-dd}|{amount}|{description}|{remittance}");
+            : StableId.From("h_", $"{occurredAt:yyyy-MM-dd}|{amount}|{description}|{remittance}");
 
         return new IncomingTransaction(
             externalId, amount,
@@ -191,11 +188,5 @@ public class EnableBankingProvider(
                 return v.GetString();
         }
         return null;
-    }
-
-    private static string StableHash(string input)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
-        return "h_" + Convert.ToHexString(bytes)[..24].ToLowerInvariant();
     }
 }

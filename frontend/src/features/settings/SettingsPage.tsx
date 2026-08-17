@@ -347,7 +347,9 @@ function EnableBankingModal({ onClose }: { onClose: () => void }) {
             {shown.length === 0 && <p className="px-4 py-6 text-center text-sm text-faint">{busy ? 'Loading…' : 'No banks found.'}</p>}
           </div>
           <p className="text-xs text-faint">
-            You will be redirected to the bank to approve read-only access (valid ~90 days), then brought back here.
+            You will be redirected to the bank to approve read-only access (valid ~90 days), then brought back to{' '}
+            <code className="rounded bg-paper px-1">{window.location.origin}/settings</code> — this exact URL must be in
+            your Enable Banking app's allowed redirect URLs.
           </p>
           {error && <p className="text-sm text-danger">{error}</p>}
         </div>

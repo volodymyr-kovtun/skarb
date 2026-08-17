@@ -55,6 +55,15 @@ using (var scope = app.Services.CreateScope())
     await Seed.EnsureSeededAsync(db);
 }
 
+// Bank/provider failures are expected operational errors (bad redirect URI, expired
+// consent, rate limit) — surface their message to the UI instead of a bare 500.
+app.UseExceptionHandler(errApp => errApp.Run(async ctx =>
+{
+    var ex = ctx.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
+    ctx.Response.StatusCode = ex is InvalidOperationException ? StatusCodes.Status400BadRequest : StatusCodes.Status500InternalServerError;
+    await ctx.Response.WriteAsJsonAsync(new { error = ex?.Message ?? "Unexpected error" });
+}));
+
 app.UseCors();
 app.MapOpenApi();
 

@@ -11,12 +11,18 @@ namespace Skarb.Api.Features.Webhooks;
 /// Receives Monobank push notifications. Must always answer 200 quickly —
 /// three failed deliveries and Monobank disables the webhook.
 /// </summary>
+/// <remarks>
+/// The only endpoints Skarb exposes without a session: Monobank calls them, not a browser.
+/// They carry no secret of their own, so the guard is the unguessable connection id in the
+/// path plus the fact that they only ever accept statement items for accounts already known
+/// to that connection — an unknown id changes nothing and still answers 200.
+/// </remarks>
 public class MonobankWebhookEndpoints : IEndpointGroup
 {
     public void Map(IEndpointRouteBuilder app)
     {
         // Validation ping: Monobank sends GET and requires exactly HTTP 200.
-        app.MapGet("/api/webhooks/monobank/{connectionId:guid}", () => Results.Ok());
+        app.MapGet("/api/webhooks/monobank/{connectionId:guid}", () => Results.Ok()).AllowAnonymous();
 
         app.MapPost("/api/webhooks/monobank/{connectionId:guid}",
             async (Guid connectionId, HttpRequest request, SkarbDbContext db,
@@ -57,6 +63,6 @@ public class MonobankWebhookEndpoints : IEndpointGroup
             });
 
             return Results.Ok();
-        });
+        }).AllowAnonymous();
     }
 }

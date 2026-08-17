@@ -17,6 +17,9 @@ Built for a PKO BP + ZEN + Monobank setup, but works with 2,500+ European banks.
 
 ## Features
 
+- **Single-owner sign-in** — password + TOTP two-factor, single-use recovery codes,
+  session cookies and a deny-by-default API. The instance is claimed once, through a
+  setup token printed to the server log; there is no signup.
 - **Overview dashboard** — net worth across all currencies (converted to PLN), monthly
   earned / spent / **invested** / net, 6-month cashflow chart, spending-by-category donut
 - **Internal transfer detection** — moving money between your own accounts (e.g. between two
@@ -91,12 +94,14 @@ backend/Skarb.Api/
     Abstractions/     IBankProvider, ITransactionIngestor, ICategorizer,
                       ITransferDetector, IExchangeRateService, ISyncService, IEndpointGroup
     Services/         TransactionIngestor, RuleBasedCategorizer, TransferDetector
+    Security/         IPasswordHasher, ITotpAuthenticator, IRecoveryCodeService,
+                      IOwnerStore, IOwnerAuthenticator, IOwnerSetup + cookie/authz wiring
   Infrastructure/
     Banking/Monobank/       MonobankApiClient (HTTP) + MonobankProvider (IBankProvider)
     Banking/EnableBanking/  EnableBankingApiClient (HTTP+JWT) + EnableBankingProvider
     Fx/                     OpenErApiExchangeRateService
   Features/           one folder per slice, endpoints implement IEndpointGroup
-    Accounts/ Transactions/ Categories/ Tags/ Dashboard/
+    Auth/ Accounts/ Transactions/ Categories/ Tags/ Dashboard/
     Connections/ Sync/ Import/ Webhooks/ Meta/
   Migrations/         EF Core migrations
 frontend/src/
@@ -113,13 +118,48 @@ Key seams:
   behave identically.
 - **`ITransferDetector` / `ICategorizer`** — isolated policies, replaceable without touching
   ingestion or providers.
+- **`IOwnerAuthenticator` and friends** — the sign-in decision is one policy composed of small
+  ones (`IPasswordHasher`, `ITotpAuthenticator`, `IRecoveryCodeService`, `IOwnerStore`), none
+  of which knows about HTTP or EF. Authorization is a **deny-by-default fallback policy**, so
+  a new endpoint slice is protected the moment it exists — the handful of public routes opt
+  out explicitly and visibly.
+
+## Signing in
+
+On first start Skarb has no owner and prints a **setup token** to the log:
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│  Skarb has no owner yet — open the app to claim it.           │
+│  Setup token:  ABCD1234…                                      │
+└───────────────────────────────────────────────────────────────┘
+```
+
+Open the app and complete setup: email + password → scan the QR with any TOTP app
+(1Password, Aegis, Bitwarden, Google Authenticator) → save the recovery codes. After that
+the whole API requires a session; only the SPA shell, the sign-in endpoints and the
+Monobank webhook are reachable without one.
+
+Password, recovery codes and two-factor status live under **Settings → Security**.
+Set `Auth__SetupToken` to choose your own token instead of the generated one.
+
+## Deploying
+
+Running Skarb anywhere other than `localhost` needs a few deliberate choices — a persistent
+data-protection key ring, HTTPS with forwarded headers, an updated Enable Banking redirect
+URL, and an honest look at whether the free open-banking tier permits what you have in mind
+(short version: yes for your own accounts, no for other people's).
+
+**Read [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).**
 
 ## Security notes
 
-- Bank tokens/keys are stored in the local PostgreSQL database. Fine for a personal machine;
-  don't expose ports 5178/5179/5432 to the internet.
-- The only thing that ever needs public exposure is the Monobank webhook path — use a
-  Cloudflare/Tailscale tunnel for that (see the guide), never a raw port-forward.
+- Bank tokens/keys are stored in the PostgreSQL database in plain text. Treat the database
+  like a password vault — encrypted backups, restricted access.
+- Never expose port 5432, and put the app behind a reverse proxy rather than facing the
+  internet directly. Reaching it over Tailscale instead of a public URL is the safer default.
+- The Monobank webhook path is the only API endpoint that is public by design; it embeds an
+  unguessable connection id and only accepts items for accounts it already knows.
 - Exchange rates come from open.er-api.com (no key needed) and are cached for 12 h;
   everything else talks only to your banks' official APIs.
 

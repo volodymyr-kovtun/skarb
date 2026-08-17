@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Skarb.Api.Common.Persistence;
@@ -11,9 +12,11 @@ using Skarb.Api.Common.Persistence;
 namespace Skarb.Api.Migrations
 {
     [DbContext(typeof(SkarbDbContext))]
-    partial class SkarbDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260817185640_AddTransactionTypeCode")]
+    partial class AddTransactionTypeCode
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -171,77 +174,6 @@ namespace Skarb.Api.Migrations
                     b.HasIndex("CategoryId");
 
                     b.ToTable("CategoryRules");
-                });
-
-            modelBuilder.Entity("Skarb.Api.Common.Domain.OwnerAccount", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("FailedAttempts")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("LastLoginAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long>("LastTotpStep")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime?>("LockedUntil")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("PasswordHash")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("SecurityStamp")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<bool>("TotpEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("TotpSecret")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Email")
-                        .IsUnique();
-
-                    b.ToTable("Owners");
-                });
-
-            modelBuilder.Entity("Skarb.Api.Common.Domain.RecoveryCode", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CodeHash")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("OwnerId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("UsedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OwnerId");
-
-                    b.ToTable("RecoveryCodes", (string)null);
                 });
 
             modelBuilder.Entity("Skarb.Api.Common.Domain.SyncLog", b =>
@@ -406,17 +338,6 @@ namespace Skarb.Api.Migrations
                     b.Navigation("Category");
                 });
 
-            modelBuilder.Entity("Skarb.Api.Common.Domain.RecoveryCode", b =>
-                {
-                    b.HasOne("Skarb.Api.Common.Domain.OwnerAccount", "Owner")
-                        .WithMany("RecoveryCodes")
-                        .HasForeignKey("OwnerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Owner");
-                });
-
             modelBuilder.Entity("Skarb.Api.Common.Domain.Transaction", b =>
                 {
                     b.HasOne("Skarb.Api.Common.Domain.Account", "Account")
@@ -465,11 +386,6 @@ namespace Skarb.Api.Migrations
                     b.Navigation("Rules");
 
                     b.Navigation("Transactions");
-                });
-
-            modelBuilder.Entity("Skarb.Api.Common.Domain.OwnerAccount", b =>
-                {
-                    b.Navigation("RecoveryCodes");
                 });
 #pragma warning restore 612, 618
         }

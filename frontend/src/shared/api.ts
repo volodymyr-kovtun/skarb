@@ -43,9 +43,22 @@ export type SyncStatus = {
   logs: { at: string; provider: string; message: string; success: boolean; newTransactions: number }[]
 }
 
+export type Session = { authenticated: boolean; email: string | null; setupRequired: boolean }
+export type SetupChallenge = { secret: string; provisioningUri: string }
+
+/** No session (or it expired). Thrown separately so the app can fall back to the sign-in screen. */
+export class UnauthorizedError extends Error {
+  constructor(message = 'Your session has ended. Please sign in again.') {
+    super(message)
+    this.name = 'UnauthorizedError'
+  }
+}
+
 async function http<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     headers: { 'Content-Type': 'application/json' },
+    // The session lives in an HttpOnly cookie — it has to ride along with every call.
+    credentials: 'include',
     ...init,
   })
   if (!res.ok) {
@@ -54,6 +67,7 @@ async function http<T>(url: string, init?: RequestInit): Promise<T> {
       const body = await res.json()
       if (body?.error) message = body.error
     } catch { /* keep default */ }
+    if (res.status === 401) throw new UnauthorizedError(message)
     throw new Error(message)
   }
   if (res.status === 204) return undefined as T
@@ -66,6 +80,20 @@ const patch = <T,>(url: string, body: unknown) => http<T>(url, { method: 'PATCH'
 const del = (url: string) => http<void>(url, { method: 'DELETE' })
 
 export const api = {
+  session: () => get<Session>('/api/auth/session'),
+  setup: (body: { setupToken: string; email: string; password: string }) =>
+    post<SetupChallenge>('/api/auth/setup', body),
+  setupConfirm: (body: { setupToken: string; code: string }) =>
+    post<{ recoveryCodes: string[] }>('/api/auth/setup/confirm', body),
+  login: (body: { email: string; password: string; code?: string; recoveryCode?: string }) =>
+    post<void>('/api/auth/login', body),
+  logout: () => post<void>('/api/auth/logout'),
+  changePassword: (body: { currentPassword: string; newPassword: string }) =>
+    post<void>('/api/auth/password', body),
+  newRecoveryCodes: (body: { currentPassword: string }) =>
+    post<{ recoveryCodes: string[] }>('/api/auth/recovery-codes', body),
+  recoveryCodesLeft: () => get<{ remaining: number }>('/api/auth/recovery-codes/remaining'),
+
   meta: () => get<Meta>('/api/meta'),
   dashboard: () => get<Dashboard>('/api/dashboard'),
 

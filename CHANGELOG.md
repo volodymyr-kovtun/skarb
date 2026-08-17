@@ -7,6 +7,16 @@ All notable changes to Skarb are documented here. The format follows
 
 ### Added
 - Initial public release.
+- **Authentication.** Single-owner sign-in with password (PBKDF2-HMAC-SHA512) and mandatory
+  TOTP two-factor, plus eight single-use recovery codes. First-run setup is gated by a setup
+  token printed to the server log, so a deployed instance cannot be claimed by a stranger.
+- Session cookies (`HttpOnly`, `Secure`, `SameSite=Lax`) backed by a persistable
+  data-protection key ring; changing the password invalidates every other session.
+- Deny-by-default API authorization: new endpoints are protected unless they opt out.
+  Per-IP rate limiting and per-account lockout on the credential endpoints.
+- Settings → Security: change password, view two-factor status, regenerate recovery codes.
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — deploying safely, and what the free Enable
+  Banking tier does and does not permit.
 - Dashboard: net worth across currencies, monthly earned / spent / invested / net,
   6-month cashflow chart, spending-by-category donut, recent activity.
 - Transactions: search, filters (account, category, uncategorized, internal transfers,

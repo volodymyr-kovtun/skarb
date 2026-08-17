@@ -5,6 +5,7 @@ import { formatDistanceToNow, parseISO } from 'date-fns'
 import { Landmark, Plug, Upload, Trash2, RefreshCw, Webhook, CheckCircle2, AlertCircle, History } from 'lucide-react'
 import { accountLabel, api, refreshAll, type Connection, type Meta } from '../../shared/api'
 import { Card, CardHeader, Modal, btnGhost, btnPrimary, errMsg, fieldLabelCls, inputCls } from '../../shared/ui'
+import { SecuritySettings } from '../auth/SecuritySettings'
 
 export default function SettingsPage() {
   const qc = useQueryClient()
@@ -99,6 +100,8 @@ export default function SettingsPage() {
           )}
         </div>
       </Card>
+
+      <SecuritySettings />
 
       {monoOpen && <MonobankModal onClose={() => setMonoOpen(false)} onDone={() => { setMonoOpen(false); refresh() }} />}
       {ebOpen && <EnableBankingModal onClose={() => setEbOpen(false)} />}

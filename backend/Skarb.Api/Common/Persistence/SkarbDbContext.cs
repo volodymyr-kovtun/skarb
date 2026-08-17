@@ -12,6 +12,7 @@ public class SkarbDbContext(DbContextOptions<SkarbDbContext> options) : DbContex
     public DbSet<BankConnection> Connections => Set<BankConnection>();
     public DbSet<CategoryRule> CategoryRules => Set<CategoryRule>();
     public DbSet<SyncLog> SyncLogs => Set<SyncLog>();
+    public DbSet<OwnerAccount> Owners => Set<OwnerAccount>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -47,5 +48,13 @@ public class SkarbDbContext(DbContextOptions<SkarbDbContext> options) : DbContex
             .WithMany(c => c.Rules)
             .OnDelete(DeleteBehavior.Cascade);
         b.Entity<Tag>().HasIndex(t => t.Name).IsUnique();
+
+        b.Entity<OwnerAccount>().HasIndex(o => o.Email).IsUnique();
+        b.Entity<RecoveryCode>().ToTable("RecoveryCodes");
+        b.Entity<OwnerAccount>()
+            .HasMany(o => o.RecoveryCodes)
+            .WithOne(r => r.Owner)
+            .HasForeignKey(r => r.OwnerId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

@@ -9,6 +9,14 @@ node_modules/
 dist/
 *.local
 
+# Secrets — private keys never belong in the repo
+*.pem
+*.key
+
+# Data-protection key ring (encrypts the session cookie)
+keys/
+backend/Skarb.Api/keys/
+
 # OS / editor
 .DS_Store
 .vs/

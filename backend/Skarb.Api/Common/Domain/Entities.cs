@@ -67,6 +67,8 @@ public class Transaction
     /// <summary>Counterparty IBAN when the bank provides it — used for internal-transfer detection.</summary>
     public string? CounterIban { get; set; }
     public int? Mcc { get; set; }
+    /// <summary>Bank-supplied transaction type code (e.g. "CARD-ATM", "MOBILE-PAYMENT-C2C"), when available.</summary>
+    public string? TypeCode { get; set; }
     public Guid? CategoryId { get; set; }
     public Category? Category { get; set; }
     public List<Tag> Tags { get; set; } = [];
@@ -125,6 +127,47 @@ public class CategoryRule
     public Guid CategoryId { get; set; }
     public Category? Category { get; set; }
     public int Priority { get; set; }
+}
+
+/// <summary>
+/// The single person who owns this Skarb instance. Skarb is deliberately single-tenant:
+/// there is at most one row, created once through the first-run setup flow.
+/// </summary>
+public class OwnerAccount
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Email { get; set; } = "";
+    /// <summary>Opaque, versioned hash produced by <c>IPasswordHasher</c> — never a raw digest.</summary>
+    public string PasswordHash { get; set; } = "";
+    /// <summary>Base32 TOTP shared secret (RFC 4648), as handed to the authenticator app.</summary>
+    public string TotpSecret { get; set; } = "";
+    /// <summary>False until the owner proves they can generate a code, so setup can't lock them out.</summary>
+    public bool TotpEnabled { get; set; }
+    /// <summary>Highest TOTP time-step already accepted — blocks replay of an observed code.</summary>
+    public long LastTotpStep { get; set; }
+    /// <summary>Changes whenever credentials change; live cookies carrying an old stamp are rejected.</summary>
+    public string SecurityStamp { get; set; } = Guid.NewGuid().ToString("N");
+    public int FailedAttempts { get; set; }
+    public DateTime? LockedUntil { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? LastLoginAt { get; set; }
+    public List<RecoveryCode> RecoveryCodes { get; set; } = [];
+}
+
+/// <summary>Single-use fallback for a lost authenticator. Stored hashed, like a password.</summary>
+public class RecoveryCode
+{
+    /// <remarks>
+    /// Deliberately not pre-seeded with a Guid, unlike the other entities here. These are
+    /// created by adding them to <see cref="OwnerAccount.RecoveryCodes"/> on an already-tracked
+    /// owner, and EF decides insert-vs-update for such children by whether the key is set —
+    /// a pre-set key would make it try to UPDATE rows that do not exist yet.
+    /// </remarks>
+    public Guid Id { get; set; }
+    public Guid OwnerId { get; set; }
+    public OwnerAccount? Owner { get; set; }
+    public string CodeHash { get; set; } = "";
+    public DateTime? UsedAt { get; set; }
 }
 
 public class SyncLog

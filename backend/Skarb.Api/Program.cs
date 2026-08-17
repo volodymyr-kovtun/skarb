@@ -1,7 +1,9 @@
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Skarb.Api.Common.Abstractions;
 using Skarb.Api.Common.Endpoints;
 using Skarb.Api.Common.Persistence;
+using Skarb.Api.Common.Security;
 using Skarb.Api.Common.Services;
 using Skarb.Api.Features.Import;
 using Skarb.Api.Features.Sync;
@@ -19,6 +21,10 @@ builder.Services.AddDbContext<SkarbDbContext>(o =>
 // --- options ---
 builder.Services.Configure<SyncOptions>(builder.Configuration.GetSection(SyncOptions.Section));
 builder.Services.Configure<FxOptions>(builder.Configuration.GetSection(FxOptions.Section));
+
+// --- security (owner sign-in, session cookie, deny-by-default authorization) ---
+builder.Services.AddSkarbAuthentication(builder.Configuration, builder.Environment);
+builder.Services.AddSkarbRateLimiting();
 
 // --- core pipeline (SRP: ingest → categorize → detect transfers) ---
 builder.Services.AddHttpClient();
@@ -39,8 +45,11 @@ builder.Services.AddScoped<CsvImportService>();
 builder.Services.AddSingleton<ISyncService, SyncService>();
 builder.Services.AddHostedService<BackgroundSyncService>();
 
+var authOptions = builder.Configuration.GetSection(AuthOptions.Section).Get<AuthOptions>() ?? new AuthOptions();
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
-    .WithOrigins("http://localhost:5173", "http://127.0.0.1:5173")
+    // Credentialed requests forbid a wildcard origin, so the list stays explicit.
+    .WithOrigins(["http://localhost:5173", "http://127.0.0.1:5173", .. authOptions.AllowedOrigins])
+    .AllowCredentials()
     .AllowAnyHeader()
     .AllowAnyMethod()));
 
@@ -53,28 +62,53 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<SkarbDbContext>();
     await db.Database.MigrateAsync();
     await Seed.EnsureSeededAsync(db);
+    await SetupAnnouncement.WriteIfUnclaimedAsync(scope.ServiceProvider, app.Logger);
 }
+
+// Behind a reverse proxy (Caddy, nginx, Cloudflare) the app only learns the request was
+// HTTPS from these headers — without them "Secure" cookies never get set.
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+});
 
 // Bank/provider failures are expected operational errors (bad redirect URI, expired
 // consent, rate limit) — surface their message to the UI instead of a bare 500.
+// Anything else is a bug, and its message stays out of the response once deployed.
 app.UseExceptionHandler(errApp => errApp.Run(async ctx =>
 {
     var ex = ctx.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
-    ctx.Response.StatusCode = ex is InvalidOperationException ? StatusCodes.Status400BadRequest : StatusCodes.Status500InternalServerError;
-    await ctx.Response.WriteAsJsonAsync(new { error = ex?.Message ?? "Unexpected error" });
+    var expected = ex is InvalidOperationException;
+    ctx.Response.StatusCode = expected ? StatusCodes.Status400BadRequest : StatusCodes.Status500InternalServerError;
+    var message = expected || app.Environment.IsDevelopment()
+        ? ex?.Message ?? "Unexpected error"
+        : "Unexpected error";
+    await ctx.Response.WriteAsJsonAsync(new { error = message });
 }));
 
-app.UseCors();
-app.MapOpenApi();
+var hasFrontend = Directory.Exists(Path.Combine(app.Environment.ContentRootPath, "wwwroot"));
 
-app.MapEndpointGroups();
-
-// Serve the built frontend when it has been published into wwwroot.
-if (Directory.Exists(Path.Combine(app.Environment.ContentRootPath, "wwwroot")))
+// Static assets are served ahead of authorization on purpose. The deny-by-default policy
+// also covers requests that match no endpoint, and /assets/*.js is exactly that — leaving
+// it behind the gate would 401 the bundle and leave nobody able to reach the sign-in form.
+// The bundle carries no data of its own; the API behind it is what's protected.
+if (hasFrontend)
 {
     app.UseDefaultFiles();
     app.UseStaticFiles();
-    app.MapFallbackToFile("index.html");
 }
+
+app.UseCors();
+app.UseRateLimiter();
+app.UseAuthentication();
+app.UseAuthorization();
+
+if (app.Environment.IsDevelopment()) app.MapOpenApi();
+
+app.MapEndpointGroups();
+
+// Deep links (/settings, /accounts) fall back to the SPA shell, which then decides
+// whether to show the sign-in screen or the app.
+if (hasFrontend) app.MapFallbackToFile("index.html").AllowAnonymous();
 
 app.Run();

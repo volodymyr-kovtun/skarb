@@ -1,6 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { LayoutGrid, ArrowLeftRight, Wallet, Shapes, Settings, RefreshCw } from 'lucide-react'
+import { LayoutGrid, ArrowLeftRight, Wallet, Shapes, Settings, RefreshCw, LogOut } from 'lucide-react'
 import { api } from './api'
 import { btnGhost } from './ui'
 
@@ -21,9 +21,16 @@ export default function Layout() {
   })
   const syncing = (status?.running.length ?? 0) > 0
 
+  const { data: session } = useQuery({ queryKey: ['session'], queryFn: api.session })
+
   const syncNow = async () => {
     await api.syncAll()
     qc.invalidateQueries({ queryKey: ['sync-status'] })
+  }
+
+  const signOut = async () => {
+    await api.logout()
+    qc.invalidateQueries() // re-reads the session, which drops back to the sign-in screen
   }
 
   return (
@@ -69,6 +76,20 @@ export default function Layout() {
               {status!.running.join(', ')}
             </p>
           )}
+
+          <div className="mt-2 flex items-center gap-1 border-t border-line pt-3">
+            <span className="min-w-0 flex-1 truncate px-1 text-xs text-faint" title={session?.email ?? ''}>
+              {session?.email}
+            </span>
+            <button
+              onClick={signOut}
+              title="Sign out"
+              aria-label="Sign out"
+              className="rounded-lg p-1.5 text-muted transition-colors hover:bg-paper hover:text-ink"
+            >
+              <LogOut size={15} />
+            </button>
+          </div>
         </div>
       </aside>
 

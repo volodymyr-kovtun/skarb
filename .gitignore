@@ -13,3 +13,6 @@ dist/
 .DS_Store
 .vs/
 .idea/
+
+# Keep the lockfile even if a global gitignore excludes it (reproducible CI installs)
+!frontend/package-lock.json

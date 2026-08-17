@@ -1,5 +1,8 @@
 # Skarb
 
+[![CI](https://github.com/volodymyr-kovtun/skarb/actions/workflows/ci.yml/badge.svg)](https://github.com/volodymyr-kovtun/skarb/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 **Skarb** (Polish & Ukrainian for *treasure*) is a self-hosted personal finance app in the spirit
 of Copilot Money and Bilance: one clean dashboard for all your accounts, automatic bank sync,
 categories, tags and investment tracking — running entirely on your own machine.
@@ -116,3 +119,16 @@ Key seams:
   Cloudflare/Tailscale tunnel for that (see the guide), never a raw port-forward.
 - Exchange rates come from open.er-api.com (no key needed) and are cached for 12 h;
   everything else talks only to your banks' official APIs.
+
+See [SECURITY.md](SECURITY.md) for the threat model and how to report vulnerabilities.
+
+## Contributing
+
+Bug reports, bank presets and new providers are welcome — see
+[CONTRIBUTING.md](CONTRIBUTING.md). Please follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## License
+
+[MIT](LICENSE) © Volodymyr Kovtun. Skarb is not affiliated with any bank or with
+Enable Banking; it accesses only accounts you own, with your consent, read-only.
+See [docs/PRIVACY.md](docs/PRIVACY.md) and [docs/TERMS.md](docs/TERMS.md).

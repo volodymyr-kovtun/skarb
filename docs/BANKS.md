@@ -166,8 +166,24 @@ no code changes needed.
 - **Sync now** in the sidebar (or per connection in Settings) triggers the same thing
   on demand; progress and results appear under **Settings → Sync activity**.
 - New transactions are auto-categorized: your keyword rules first
-  (**Categories → Auto-categorization rules**), then Monobank MCC codes, then income heuristics.
+  (**Categories → Auto-categorization rules**), then Monobank MCC codes, then a few
+  heuristics (person-to-person rails → "Transfers to/from people", small anonymous credits →
+  cashback). ~190 rules for the Polish market and common global merchants are seeded; edit or
+  delete any of them. Rules are **direction-aware** (an income category only matches money
+  in) and match **whole words** on transfers/notes, plain substrings on glued card descriptors.
   Everything can be recategorized by clicking the transaction.
+- **PKO sends no MCC codes** through Enable Banking, so for PKO only rules and the bank's
+  type codes (`CARD-ATM`, `MOBILE-PAYMENT-C2C`, `FEE`, …) drive categorization. Card
+  descriptors arrive as `CITY+MERCHANT+COUNTRY` glued together; Skarb cleans them
+  (`WARSZAWAJMP S.A. BIEDRONKA 7184PL` → `JMP S.A. BIEDRONKA 7184`) and keeps the raw text
+  in the note for search.
+- After adding rules, **Categories → Apply to uncategorized** runs them over existing
+  transactions without touching anything you categorized by hand. After a mapping
+  improvement, the ⟲ **Full re-sync** button on a connection re-fetches the whole history and
+  refreshes existing rows.
+- Currency exchanges between your own accounts (PKO `FX… EUR/PLN` legs) are paired by the
+  bank's shared reference and marked internal, even though the two legs have different
+  amounts and currencies.
 - After every sync/import Skarb runs **internal-transfer detection**: counter-IBANs matching
   your own accounts, and opposite-amount pairs on two accounts within 72 hours, are marked
   *internal* and excluded from all metrics. Cross-currency transfers (e.g. PLN→EUR top-ups)

@@ -3,7 +3,7 @@
 
 BACKEND_DIR  := backend/Skarb.Api
 FRONTEND_DIR := frontend
-APP_URL      := http://localhost:5178
+APP_URL      := https://localhost:5179
 DB_CONTAINER := skarb-postgres
 
 .DEFAULT_GOAL := help
@@ -35,25 +35,30 @@ deps-reset: ## DESTROY the database and start fresh
 	docker compose up -d --wait
 
 .PHONY: install
-install: ## Restore backend packages + install frontend node modules
+install: ## Restore backend packages + install frontend node modules + trust the local HTTPS dev cert
 	dotnet restore $(BACKEND_DIR)
 	cd $(FRONTEND_DIR) && npm install
+	dotnet dev-certs https --trust
+
+.PHONY: https-trust
+https-trust: ## (Re)create and trust the localhost HTTPS certificate used by the API
+	dotnet dev-certs https --trust
 
 # ---------------------------------------------------------------- run
 
 .PHONY: run
-run: deps-up frontend ## Run the full app (builds SPA, serves everything on :5178)
+run: deps-up frontend ## Run the full app (builds SPA, serves on https://localhost:5179 + http://localhost:5178)
 	cd $(BACKEND_DIR) && dotnet run
 
 .PHONY: dev
-dev: deps-up ## Dev mode: API on :5178 + Vite hot reload on :5173 (Ctrl+C stops both)
+dev: deps-up ## Dev mode: API on :5179/:5178 + Vite hot reload on :5173 (Ctrl+C stops both)
 	@trap 'kill 0' INT TERM; \
 	( cd $(BACKEND_DIR) && dotnet run ) & \
 	( cd $(FRONTEND_DIR) && npm run dev ) & \
 	wait
 
 .PHONY: dev-api
-dev-api: deps-up ## Dev mode: backend only (:5178)
+dev-api: deps-up ## Dev mode: backend only (https :5179, http :5178)
 	cd $(BACKEND_DIR) && dotnet run
 
 .PHONY: dev-web

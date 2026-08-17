@@ -49,18 +49,21 @@ make run
 
 That starts PostgreSQL in Docker (waits until healthy), builds the SPA into the API's
 `wwwroot`, applies EF migrations, seeds default categories and serves everything on
-**http://localhost:5178**.
+**https://localhost:5179** (and plain http on :5178). HTTPS uses the standard .NET
+`localhost` dev certificate — run `make https-trust` once if your browser warns about it.
+Open-banking providers require an `https://` redirect URL, which is why HTTPS is the default.
 
 | Command | What it does |
 |---|---|
-| `make run` | Run the full app on :5178 (deps + SPA build included) |
+| `make run` | Run the full app on https://localhost:5179 (deps + SPA build included) |
 | `make dev` | Dev mode: API :5178 + Vite hot reload :5173, Ctrl+C stops both |
 | `make deps-up` / `deps-down` | Start / stop PostgreSQL (data kept) |
 | `make deps-reset` | **Destroy** the database and start fresh |
 | `make build` / `make check` | Build everything / CI-style typecheck + build |
 | `make migrate NAME=AddX` | Create an EF Core migration |
 | `make db-shell` | psql shell into the database |
-| `make install` | dotnet restore + npm install |
+| `make install` | dotnet restore + npm install + trust the HTTPS dev cert |
+| `make https-trust` | (Re)trust the localhost HTTPS certificate |
 
 ### Database
 
@@ -114,7 +117,7 @@ Key seams:
 ## Security notes
 
 - Bank tokens/keys are stored in the local PostgreSQL database. Fine for a personal machine;
-  don't expose ports 5178/5432 to the internet.
+  don't expose ports 5178/5179/5432 to the internet.
 - The only thing that ever needs public exposure is the Monobank webhook path — use a
   Cloudflare/Tailscale tunnel for that (see the guide), never a raw port-forward.
 - Exchange rates come from open.er-api.com (no key needed) and are cached for 12 h;

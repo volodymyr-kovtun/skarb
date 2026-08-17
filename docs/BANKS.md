@@ -96,7 +96,9 @@ personal finance.
 3. In the Enable Banking **Control Panel → API Applications → Register new application**:
    - Environment: **Production**
    - Upload `skarb_eb_public.pem` (the public key)
-   - Redirect URL: `http://localhost:5178/settings` — must match exactly what Skarb sends
+   - Redirect URL: `https://localhost:5179/settings` — must be **https** (Enable Banking rejects
+     plain http) and match exactly what Skarb sends; add `https://localhost:5173/settings` too if you
+     use `make dev`
    - Copy the generated **Application ID**
 4. The app activates in **restricted mode** ("linked accounts"): in the portal, follow
    *linked accounts* and authenticate to **your own PKO BP** account there once, so the API

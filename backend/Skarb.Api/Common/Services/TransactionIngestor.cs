@@ -25,6 +25,8 @@ public class TransactionIngestor(SkarbDbContext db, ICategorizer categorizer) : 
                 known.Amount = item.Amount;
                 known.Description = item.Description;
                 known.OccurredAt = item.OccurredAtUtc;
+                known.TypeCode ??= item.TypeCode;
+                known.CounterIban ??= item.CounterIban;
                 continue;
             }
 
@@ -38,6 +40,7 @@ public class TransactionIngestor(SkarbDbContext db, ICategorizer categorizer) : 
                 CounterParty = item.CounterParty,
                 CounterIban = item.CounterIban,
                 Mcc = item.Mcc,
+                TypeCode = item.TypeCode,
                 OccurredAt = item.OccurredAtUtc,
                 Source = item.Source,
                 Note = item.Note,

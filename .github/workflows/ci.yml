@@ -24,6 +24,9 @@ jobs:
       - name: Restore & build backend
         run: dotnet build backend/Skarb.Api -c Release -v q
 
+      - name: Backend tests
+        run: dotnet test backend/Skarb.Api.Tests -c Release -v q
+
       - name: Install & typecheck & build frontend
         working-directory: frontend
         run: |

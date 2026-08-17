@@ -78,10 +78,15 @@ backend: ## Build the .NET backend
 frontend: ## Build the SPA into the backend's wwwroot
 	cd $(FRONTEND_DIR) && npm run build
 
+.PHONY: test
+test: ## Run backend unit tests
+	dotnet test backend/Skarb.Api.Tests -v q
+
 .PHONY: check
-check: ## Typecheck frontend + build backend (CI-style sanity check)
+check: ## Typecheck frontend + build backend + run tests (CI-style sanity check)
 	cd $(FRONTEND_DIR) && npx tsc -b
 	dotnet build $(BACKEND_DIR) -v q
+	dotnet test backend/Skarb.Api.Tests -v q
 
 # ---------------------------------------------------------------- database
 

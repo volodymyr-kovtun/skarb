@@ -7,6 +7,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "backend", "backend", "{1AE8
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Skarb.Api", "backend\Skarb.Api\Skarb.Api.csproj", "{C8FE10DF-14EB-44D6-8AA4-17B3A92B3C3A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Skarb.Api.Tests", "backend\Skarb.Api.Tests\Skarb.Api.Tests.csproj", "{753A463C-CC97-4F8C-952D-97D567CABA19}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -29,11 +31,24 @@ Global
 		{C8FE10DF-14EB-44D6-8AA4-17B3A92B3C3A}.Release|x64.Build.0 = Release|Any CPU
 		{C8FE10DF-14EB-44D6-8AA4-17B3A92B3C3A}.Release|x86.ActiveCfg = Release|Any CPU
 		{C8FE10DF-14EB-44D6-8AA4-17B3A92B3C3A}.Release|x86.Build.0 = Release|Any CPU
+		{753A463C-CC97-4F8C-952D-97D567CABA19}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{753A463C-CC97-4F8C-952D-97D567CABA19}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{753A463C-CC97-4F8C-952D-97D567CABA19}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{753A463C-CC97-4F8C-952D-97D567CABA19}.Debug|x64.Build.0 = Debug|Any CPU
+		{753A463C-CC97-4F8C-952D-97D567CABA19}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{753A463C-CC97-4F8C-952D-97D567CABA19}.Debug|x86.Build.0 = Debug|Any CPU
+		{753A463C-CC97-4F8C-952D-97D567CABA19}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{753A463C-CC97-4F8C-952D-97D567CABA19}.Release|Any CPU.Build.0 = Release|Any CPU
+		{753A463C-CC97-4F8C-952D-97D567CABA19}.Release|x64.ActiveCfg = Release|Any CPU
+		{753A463C-CC97-4F8C-952D-97D567CABA19}.Release|x64.Build.0 = Release|Any CPU
+		{753A463C-CC97-4F8C-952D-97D567CABA19}.Release|x86.ActiveCfg = Release|Any CPU
+		{753A463C-CC97-4F8C-952D-97D567CABA19}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{C8FE10DF-14EB-44D6-8AA4-17B3A92B3C3A} = {1AE8ACA6-933B-BF2A-3671-3E2EAC007D16}
+		{753A463C-CC97-4F8C-952D-97D567CABA19} = {1AE8ACA6-933B-BF2A-3671-3E2EAC007D16}
 	EndGlobalSection
 EndGlobal

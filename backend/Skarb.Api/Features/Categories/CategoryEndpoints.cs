@@ -113,7 +113,7 @@ public class CategoryEndpoints : IEndpointGroup
             {
                 var probe = new IncomingTransaction(t.ExternalId ?? t.Id.ToString(), t.Amount, t.Currency,
                     t.Description, t.OccurredAt, t.Source)
-                { CounterParty = t.CounterParty, Mcc = t.Mcc, Note = t.Note };
+                { CounterParty = t.CounterParty, Mcc = t.Mcc, Note = t.Note, TypeCode = t.TypeCode };
                 var cat = await categorizer.ResolveAsync(probe, CancellationToken.None);
                 if (cat is null) continue;
                 t.CategoryId = cat;

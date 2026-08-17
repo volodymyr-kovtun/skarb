@@ -46,7 +46,7 @@ public static class Seed
         ("pzu", "taxes", 23), ("nfz", "taxes", 24), ("podatek", "taxes", 25),
         // bank fees / cash (matched via PKO type codes and descriptions)
         ("card-atm", "cash", 30), ("bankomat", "cash", 31), ("wypłata gotówki", "cash", 32),
-        ("opłata za", "fees", 35), ("prowizja", "fees", 36), ("-fee", "fees", 37), (" fee", "fees", 38),
+        ("opłata za", "fees", 35), ("prowizja", "fees", 36), ("fee", "fees", 37),
         // groceries
         ("biedronka", "groceries", 50), ("żabka", "groceries", 51), ("zabka", "groceries", 52),
         ("lidl", "groceries", 53), ("auchan", "groceries", 54), ("carrefour", "groceries", 55),
@@ -56,29 +56,29 @@ public static class Seed
         // housing & utilities
         ("wspólnota mieszkaniowa", "housing", 70), ("wspolnota mieszkaniowa", "housing", 71),
         ("czynsz", "housing", 72), ("spółdzielnia", "housing", 73), ("e.on", "housing", 74),
-        ("pge ", "housing", 75), ("tauron", "housing", 76), ("enea", "housing", 77), ("innogy", "housing", 78),
+        ("pge", "housing", 75), ("tauron", "housing", 76), ("enea", "housing", 77), ("innogy", "housing", 78),
         ("pgnig", "housing", 79), ("veolia", "housing", 80), ("mpwik", "housing", 81), ("ikea", "housing", 82),
         // telecom / subscriptions
-        ("orange", "subscriptions", 90), ("play ", "subscriptions", 91), ("p4 sp", "subscriptions", 92),
+        ("orange", "subscriptions", 90), ("play", "subscriptions", 91), ("p4 sp", "subscriptions", 92),
         ("t-mobile", "subscriptions", 93), ("plus gsm", "subscriptions", 94), ("polkomtel", "subscriptions", 95),
         ("upc", "subscriptions", 96), ("netia", "subscriptions", 97), ("vectra", "subscriptions", 98),
         ("netflix", "subscriptions", 100), ("spotify", "subscriptions", 101), ("apple.com/bill", "subscriptions", 102),
         ("youtube", "subscriptions", 103), ("hbo", "subscriptions", 104), ("disney", "subscriptions", 105),
         ("anthropic", "subscriptions", 106), ("openai", "subscriptions", 107), ("chatgpt", "subscriptions", 108),
         ("github", "subscriptions", 109), ("jetbrains", "subscriptions", 110), ("digitalocean", "subscriptions", 111),
-        ("google *", "subscriptions", 112), ("google storage", "subscriptions", 113), ("icloud", "subscriptions", 114),
+        ("google", "subscriptions", 112), ("google storage", "subscriptions", 113), ("icloud", "subscriptions", 114),
         ("microsoft", "subscriptions", 115), ("adobe", "subscriptions", 116), ("notion", "subscriptions", 117),
         // transport
         ("uber", "transport", 130), ("bolt", "transport", 131), ("freenow", "transport", 132), ("free now", "transport", 133),
         ("jakdojade", "transport", 134), ("ztm", "transport", 135), ("mpk", "transport", 136), ("koleo", "transport", 137),
         ("pkp intercity", "transport", 138), ("polregio", "transport", 139), ("orlen", "transport", 140),
-        ("bp ", "transport", 141), ("shell", "transport", 142), ("circle k", "transport", 143), ("moya", "transport", 144),
-        ("parking", "transport", 145), ("spp ", "transport", 146), ("veturilo", "transport", 147), ("lime", "transport", 148),
+        ("bp", "transport", 141), ("shell", "transport", 142), ("circle k", "transport", 143), ("moya", "transport", 144),
+        ("parking", "transport", 145), ("spp", "transport", 146), ("veturilo", "transport", 147), ("lime", "transport", 148),
         // restaurants & cafes
-        ("restaura", "restaurants", 160), ("pizz", "restaurants", 161), ("kebab", "restaurants", 162),
+        ("restauracja", "restaurants", 160), ("restaurant", "restaurants", 159), ("pizza", "restaurants", 161), ("pizzeria", "restaurants", 178), ("kebab", "restaurants", 162),
         ("mcdonald", "restaurants", 163), ("kfc", "restaurants", 164), ("burger", "restaurants", 165),
         ("starbucks", "restaurants", 166), ("costa coffee", "restaurants", 167), ("coffee", "restaurants", 168),
-        ("cafe", "restaurants", 169), ("kawiarnia", "restaurants", 170), ("bar ", "restaurants", 171),
+        ("cafe", "restaurants", 169), ("kawiarnia", "restaurants", 170), ("bar", "restaurants", 171),
         ("pyszne", "restaurants", 172), ("glovo", "restaurants", 173), ("wolt", "restaurants", 174),
         ("uber eats", "restaurants", 175), ("sushi", "restaurants", 176), ("bistro", "restaurants", 177),
         // shopping
@@ -88,16 +88,16 @@ public static class Seed
         ("x-kom", "shopping", 199), ("decathlon", "shopping", 200), ("h&m", "shopping", 201),
         ("zara", "shopping", 202), ("reserved", "shopping", 203), ("sinsay", "shopping", 204),
         ("pepco", "shopping", 205), ("action", "shopping", 206), ("leroy merlin", "shopping", 207),
-        ("castorama", "shopping", 208), ("obi ", "shopping", 209), ("temu", "shopping", 210), ("aliexpress", "shopping", 211),
+        ("castorama", "shopping", 208), ("obi", "shopping", 209), ("temu", "shopping", 210), ("aliexpress", "shopping", 211),
         ("apple store", "shopping", 212), ("kwiatowy", "shopping", 213), ("kwiaciarnia", "shopping", 214),
         // health
-        ("apteka", "health", 230), ("gemini", "health", 231), ("dr.max", "health", 232), ("doz ", "health", 233),
+        ("apteka", "health", 230), ("gemini", "health", 231), ("dr.max", "health", 232), ("doz", "health", 233),
         ("medicover", "health", 234), ("luxmed", "health", 235), ("lux med", "health", 236), ("enel-med", "health", 237),
         ("dentysta", "health", 238), ("stomatolog", "health", 239), ("przychodnia", "health", 240),
         ("gymbeam", "health", 241), ("multisport", "health", 242), ("fitness", "health", 243), ("siłownia", "health", 244),
         // entertainment
         ("multikino", "entertainment", 260), ("cinema city", "entertainment", 261), ("helios", "entertainment", 262),
-        ("kino", "entertainment", 263), ("steam", "entertainment", 264), ("playstation", "entertainment", 265),
+        ("kino", "entertainment", 263), ("cinema", "entertainment", 269), ("steam", "entertainment", 264), ("playstation", "entertainment", 265),
         ("nintendo", "entertainment", 266), ("eventim", "entertainment", 267), ("ticketmaster", "entertainment", 268),
         // travel
         ("ryanair", "travel", 280), ("wizz", "travel", 281), ("lot polish", "travel", 282), ("lufthansa", "travel", 283),
@@ -109,9 +109,13 @@ public static class Seed
         // income
         ("wynagrodzenie", "salary", 320), ("salary", "salary", 321), ("pensja", "salary", 322),
         ("card-payment-return", "refunds", 330), ("zwrot", "refunds", 331), ("refund", "refunds", 332),
-        // person-to-person transfers (last resort — only when nothing above matched)
-        ("mobile-payment-c2c", "transfers-out", 400), ("blik", "transfers-out", 401),
     ];
+
+    // Default patterns from earlier versions that were replaced above (substring-era rules that
+    // misfire under whole-word matching). Removed on startup so old databases converge.
+    private static readonly string[] RetiredDefaultPatterns =
+        ["restaura", "pizz", "bp ", "play ", "pge ", "obi ", "doz ", "spp ", "bar ", "-fee", " fee", "google *",
+         "mobile-payment-c2c", "blik"];
 
     public static async Task EnsureSeededAsync(SkarbDbContext db)
     {
@@ -154,6 +158,9 @@ public static class Seed
             byKey[d.Key] = cat;
         }
         await db.SaveChangesAsync();
+
+        var retired = await db.CategoryRules.Where(r => RetiredDefaultPatterns.Contains(r.Pattern)).ToListAsync();
+        if (retired.Count > 0) { db.CategoryRules.RemoveRange(retired); await db.SaveChangesAsync(); }
 
         var existingPatterns = (await db.CategoryRules.Select(r => r.Pattern).ToListAsync())
             .ToHashSet(StringComparer.OrdinalIgnoreCase);

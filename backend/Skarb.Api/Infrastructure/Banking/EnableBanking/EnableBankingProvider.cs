@@ -183,7 +183,7 @@ public class EnableBankingProvider(
     }
 
     /// <summary>"CARD-PAYMENT", "TRANSFER-IN", "FEE" — uppercase letters/digits joined by dashes, no spaces.</summary>
-    private static bool LooksLikeTypeCode(string s) =>
+    internal static bool LooksLikeTypeCode(string s) =>
         s.Length is >= 3 and <= 40 && s.All(c => char.IsAsciiLetterUpper(c) || char.IsAsciiDigit(c) || c == '-');
 
     // PKO card rows arrive as CITY+MERCHANT+COUNTRY glued together, e.g. "WARSZAWAJMP S.A. BIEDRONKA 7184PL"
@@ -196,16 +196,15 @@ public class EnableBankingProvider(
         "BERLIN", "PARIS", "SAN JUAN", "KOSHICE", "KYIV", "KIEV", "LWOW", "LVIV",
     ];
 
-    private static string CleanCardMerchant(string details, string? typeCode)
+    internal static string CleanCardMerchant(string details, string? typeCode)
     {
         if (typeCode is null || !typeCode.StartsWith("CARD", StringComparison.Ordinal)) return details;
         var s = details;
-        if (s.Length > 3 && char.IsAsciiLetterUpper(s[^1]) && char.IsAsciiLetterUpper(s[^2]) && s[^3] != ' ' && !char.IsDigit(s[^3]))
-        {
-            // Trailing country code glued on ("...COFFEE.PLPL", "...GymBeamSK") — but keep e.g. "S.A." intact.
-            var candidate = s[..^2];
-            if (candidate.Length >= 4) s = candidate;
-        }
+        // PKO always appends the ISO country code to card descriptors ("...COFFEE.PLPL",
+        // "...7184PL", "...GymBeamSK"), so on card rows a trailing [A-Z]{2} is always the
+        // country and safe to drop. Abbreviations like "S.A." end in '.', so they're never hit.
+        if (s.Length > 4 && char.IsAsciiLetterUpper(s[^1]) && char.IsAsciiLetterUpper(s[^2]))
+            s = s[..^2];
         foreach (var city in CityPrefixes)
         {
             if (s.StartsWith(city, StringComparison.OrdinalIgnoreCase) && s.Length > city.Length + 2)

@@ -42,7 +42,7 @@ public class RuleBasedCategorizer(SkarbDbContext db) : ICategorizer
         (6300, 6300, "fees"),
     ];
 
-    private List<CategoryRule>? _rules;
+    private List<(string Pattern, Guid CategoryId, string Kind)>? _rules;
     private Dictionary<string, Guid>? _categoriesBySystemKey;
 
     public async Task<Guid?> ResolveAsync(IncomingTransaction item, CancellationToken ct)
@@ -52,12 +52,26 @@ public class RuleBasedCategorizer(SkarbDbContext db) : ICategorizer
         // so "FEE" or "CARD-ATM" can be targeted even when the description is a merchant name.
         var haystack = $"{description} {counterParty} {item.Note} {item.TypeCode}";
 
-        _rules ??= await db.CategoryRules.AsNoTracking().OrderBy(r => r.Priority).ToListAsync(ct);
-        foreach (var rule in _rules)
+        _rules ??= await db.CategoryRules.AsNoTracking()
+            .OrderBy(r => r.Priority)
+            .Select(r => new ValueTuple<string, Guid, string>(r.Pattern, r.CategoryId, r.Category!.Kind))
+            .ToListAsync(ct);
+        // Card-terminal descriptors arrive glued together ("WARSZAWAFOUNDATIONCOFFEE.PL",
+        // "mesGymBeamSK"), so word boundaries can't be trusted there — fall back to substring
+        // matching for card rows; everything else (transfers, notes) gets whole-word matching.
+        var isCardRow = item.TypeCode?.StartsWith("CARD", StringComparison.OrdinalIgnoreCase) ?? false;
+
+        foreach (var (pattern, categoryId, kind) in _rules)
         {
-            if (!string.IsNullOrWhiteSpace(rule.Pattern) &&
-                haystack.Contains(rule.Pattern, StringComparison.OrdinalIgnoreCase))
-                return rule.CategoryId;
+            // A rule only applies in the direction its category describes: income categories to
+            // money in, spending/investment categories to money out. Prevents "zwrot" (refund) on an
+            // outgoing repayment or "salary"-like words on an outgoing transfer from misfiring.
+            var directionOk = kind == CategoryKinds.Income ? amount > 0 : amount < 0;
+            if (!directionOk || string.IsNullOrWhiteSpace(pattern)) continue;
+            var hit = isCardRow
+                ? haystack.Contains(pattern, StringComparison.OrdinalIgnoreCase)
+                : Matches(haystack, pattern);
+            if (hit) return categoryId;
         }
 
         _categoriesBySystemKey ??= await db.Categories.AsNoTracking()
@@ -66,11 +80,25 @@ public class RuleBasedCategorizer(SkarbDbContext db) : ICategorizer
 
         if (amount > 0)
         {
-            // Only auto-tag small credits as cashback; large ones are left for the user (salary vs refund).
-            if (amount < 50 && _categoriesBySystemKey.TryGetValue("interest-cashback", out var income))
+            // Genuine person-to-person rails (BLIK phone transfers etc.) are gifts/repayments, not cashback.
+            // A plain named-counterparty bank transfer could equally be an employer or a client, so
+            // that is left for the user to classify once (then a keyword rule covers the future).
+            var isP2P = (item.TypeCode?.Contains("C2C", StringComparison.OrdinalIgnoreCase) ?? false) ||
+                        (item.TypeCode?.Contains("MOBILE-PAYMENT", StringComparison.OrdinalIgnoreCase) ?? false);
+            if (isP2P && _categoriesBySystemKey.TryGetValue("transfers-in", out var fromPeople))
+                return fromPeople;
+            // Small anonymous credits (card cashback, interest) — large ones stay for the user (salary vs refund).
+            var anonymous = string.IsNullOrWhiteSpace(counterParty) && !isP2P;
+            if (amount < 50 && anonymous && _categoriesBySystemKey.TryGetValue("interest-cashback", out var income))
                 return income;
             return null;
         }
+
+        // Outgoing money over person-to-person rails (BLIK phone transfers etc.).
+        var outP2P = (item.TypeCode?.Contains("C2C", StringComparison.OrdinalIgnoreCase) ?? false) ||
+                     (item.TypeCode?.Contains("MOBILE-PAYMENT", StringComparison.OrdinalIgnoreCase) ?? false);
+        if (outP2P && _categoriesBySystemKey.TryGetValue("transfers-out", out var toPeople))
+            return toPeople;
 
         if (mcc is int code)
         {
@@ -82,5 +110,25 @@ public class RuleBasedCategorizer(SkarbDbContext db) : ICategorizer
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Case-insensitive match that respects word boundaries at the pattern's alphanumeric edges,
+    /// so "zus" hits "ZUS" but not "consultZUSA", while "apple.com/bill" or "-fee" still work
+    /// as plain substrings on their punctuation edges.
+    /// </summary>
+    internal static bool Matches(string haystack, string pattern)
+    {
+        var idx = 0;
+        while ((idx = haystack.IndexOf(pattern, idx, StringComparison.OrdinalIgnoreCase)) >= 0)
+        {
+            var before = idx == 0 ? ' ' : haystack[idx - 1];
+            var after = idx + pattern.Length >= haystack.Length ? ' ' : haystack[idx + pattern.Length];
+            var leftOk = !char.IsLetterOrDigit(pattern[0]) || !char.IsLetterOrDigit(before);
+            var rightOk = !char.IsLetterOrDigit(pattern[^1]) || !char.IsLetterOrDigit(after);
+            if (leftOk && rightOk) return true;
+            idx++;
+        }
+        return false;
     }
 }

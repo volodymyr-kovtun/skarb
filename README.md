@@ -21,9 +21,10 @@ Built for a PKO BP + ZEN + Monobank setup, but works with 2,500+ European banks.
   session cookies and a deny-by-default API. The instance is claimed once, through a
   setup token printed to the server log; there is no signup.
 - **Overview dashboard** — net worth across all currencies, monthly
-  earned / spent / **invested** / net, 6-month cashflow chart, spending-by-category donut.
-  A switcher re-reports the whole page in any of your account currencies (or EUR/USD),
-  converted at today's rates.
+  earned / spent / **invested** / net, 6-month cashflow chart, and a spending donut that
+  flips between **categories and tags** — so "what did the renovation cost this month"
+  is one click, and each tag opens the transactions behind it. A switcher re-reports the
+  whole page in any of your account currencies (or EUR/USD), converted at today's rates.
 - **Internal transfer detection** — moving money between your own accounts (e.g. between two
   PKO accounts) is detected automatically, marked *internal* and never counted in any metric.
   Detection uses two signals: the counterparty IBAN matching one of your accounts, and
@@ -35,10 +36,8 @@ Built for a PKO BP + ZEN + Monobank setup, but works with 2,500+ European banks.
 - **Transactions** — search, filters (account, category, tag, plus *internal* and
   *investments* views), day grouping, manual add/edit/delete, notes, tags
 - **Category management** — full CRUD with emoji, color and kind, usage counts, plus
-  keyword auto-categorization rules and built-in MCC mapping for Monobank
-- **Tags page** — what each label cost you over a period (this / last month, this year,
-  all time), in any display currency, with the untagged remainder spelled out. A tag row
-  opens the transactions behind it; tags can be renamed, recolored and deleted here.
+  keyword auto-categorization rules, built-in MCC mapping for Monobank, and the tags
+  themselves (rename, recolor, delete)
 - **Bank sync**
   - **Monobank** — direct personal API; instant push sync via webhook (optional)
   - **PKO BP + any Enable Banking bank** — the picker lists every supported institution

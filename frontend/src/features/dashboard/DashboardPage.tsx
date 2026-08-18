@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
@@ -6,13 +7,19 @@ import {
   PieChart, Pie, Cell,
 } from 'recharts'
 import { api, fmtMoney } from '../../shared/api'
-import { Card, CardHeader, CurrencySwitch, TxRow, labelCls } from '../../shared/ui'
+import { Card, CardHeader, CurrencySwitch, Segmented, TxRow, labelCls } from '../../shared/ui'
 import { useDisplayCurrency } from '../../shared/currency'
 import { FAINT, INCOME, INK, INVESTED, SPEND, UNCATEGORIZED } from '../../shared/theme'
 import AccountsCard from './AccountsCard'
 
+type Breakdown = 'category' | 'tag'
+
+/** One wedge of the spending donut, whichever way the month is broken down. */
+type Slice = { key: string; name: string; color: string; amount: number; href?: string }
+
 export default function DashboardPage() {
   const [currency, pickCurrency] = useDisplayCurrency()
+  const [breakdown, setBreakdown] = useState<Breakdown>('category')
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard', currency],
     queryFn: () => api.dashboard(currency || undefined),
@@ -25,12 +32,24 @@ export default function DashboardPage() {
 
   const cur = data.currency
   const flow = data.cashflow.map((m) => ({ ...m, label: format(parseISO(m.month + '-01'), 'MMM') }))
-  const topCats = data.spendingByCategory.slice(0, 6)
-  const otherSum = data.spendingByCategory.slice(6).reduce((s, c) => s + c.amount, 0)
-  const donut = otherSum > 0
-    ? [...topCats, { categoryId: 'other', name: 'Other', emoji: '·', color: UNCATEGORIZED, amount: +otherSum.toFixed(2) }]
-    : topCats
   const monthDelta = data.month.net
+
+  const categorySlices: Slice[] = data.spendingByCategory.map((c) => ({
+    key: c.categoryId ?? 'uncategorized', name: c.name, color: c.color, amount: c.amount,
+  }))
+  // Tagged spending, with the untagged remainder as its own wedge so the ring still
+  // covers the month. Each tag opens the transactions behind it.
+  const tagSlices: Slice[] = [
+    ...data.spendingByTag.map((t) => ({
+      key: t.tagId, name: `#${t.name}`, color: t.color, amount: t.amount,
+      href: `/transactions?tags=${t.tagId}`,
+    })),
+    ...(data.untaggedSpending > 0
+      ? [{ key: 'untagged', name: 'Untagged', color: UNCATEGORIZED, amount: data.untaggedSpending }]
+      : []),
+  ].sort((a, b) => b.amount - a.amount)
+  const donut = topSlices(breakdown === 'category' ? categorySlices : tagSlices)
+  const nothingTagged = breakdown === 'tag' && data.spendingByTag.length === 0
 
   return (
     <div className="flex flex-col gap-5">
@@ -98,10 +117,25 @@ export default function DashboardPage() {
           </div>
         </Card>
 
-        {/* Spending by category */}
+        {/* Spending, by category or by tag */}
         <Card className="col-span-2 pb-4">
-          <CardHeader title="Spending" />
-          {donut.length === 0 ? (
+          <CardHeader
+            title="Spending"
+            action={
+              <Segmented
+                value={breakdown}
+                options={[{ value: 'category', label: 'Categories' }, { value: 'tag', label: 'Tags' }]}
+                onChange={(v) => setBreakdown(v as Breakdown)}
+                label="Break spending down by"
+              />
+            }
+          />
+          {nothingTagged ? (
+            <p className="px-5 py-10 text-center text-sm text-faint">
+              Nothing tagged this month. Tags are free-form labels — open a{' '}
+              <Link to="/transactions" className="font-medium text-ink underline">transaction</Link> to add one.
+            </p>
+          ) : donut.length === 0 ? (
             <p className="px-5 py-10 text-center text-sm text-faint">No spending yet this month.</p>
           ) : (
             <>
@@ -110,7 +144,7 @@ export default function DashboardPage() {
                   <PieChart>
                     <Pie data={donut} dataKey="amount" nameKey="name" innerRadius={54} outerRadius={72}
                       paddingAngle={2} strokeWidth={0} isAnimationActive={false}>
-                      {donut.map((c) => <Cell key={c.name} fill={c.color} />)}
+                      {donut.map((c) => <Cell key={c.key} fill={c.color} />)}
                     </Pie>
                     <Tooltip content={<DonutTip cur={cur} />} />
                   </PieChart>
@@ -124,13 +158,17 @@ export default function DashboardPage() {
               </div>
               <ul className="mt-2 flex flex-col gap-1 px-5">
                 {donut.map((c) => (
-                  <li key={c.name} className="flex items-center gap-2 text-sm">
-                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: c.color }} />
-                    <span className="truncate text-muted">{c.name}</span>
-                    <span className="tnum ml-auto font-medium">{fmtMoney(c.amount, cur)}</span>
+                  <li key={c.key}>
+                    <SliceRow slice={c} cur={cur} />
                   </li>
                 ))}
               </ul>
+              {breakdown === 'tag' && data.multiTagCount > 0 && (
+                <p className="px-5 pt-2 text-[11px] text-faint">
+                  {data.multiTagCount} transaction{data.multiTagCount === 1 ? '' : 's'} carr
+                  {data.multiTagCount === 1 ? 'ies' : 'y'} more than one tag, so these slices overlap.
+                </p>
+              )}
             </>
           )}
         </Card>
@@ -154,6 +192,28 @@ export default function DashboardPage() {
       </Card>
     </div>
   )
+}
+
+/** Six wedges plus an "Other" catch-all — more than that and the ring stops being readable. */
+function topSlices(slices: Slice[], limit = 6): Slice[] {
+  if (slices.length <= limit) return slices
+  const rest = slices.slice(limit).reduce((sum, s) => sum + s.amount, 0)
+  return [...slices.slice(0, limit), { key: 'other', name: 'Other', color: UNCATEGORIZED, amount: +rest.toFixed(2) }]
+}
+
+/** A legend line. Tags link to the transactions behind them; categories have nowhere to go yet. */
+function SliceRow({ slice, cur }: { slice: Slice; cur: string }) {
+  const body = (
+    <>
+      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: slice.color }} />
+      <span className="truncate text-muted group-hover:text-ink">{slice.name}</span>
+      <span className="tnum ml-auto font-medium">{fmtMoney(slice.amount, cur)}</span>
+    </>
+  )
+  const cls = 'flex w-full items-center gap-2 text-sm'
+  return slice.href
+    ? <Link to={slice.href} className={`group ${cls}`}>{body}</Link>
+    : <span className={cls}>{body}</span>
 }
 
 function StatTile({ label, value, prev, cur, accent, footer, signed = false }:

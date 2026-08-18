@@ -28,9 +28,9 @@ All notable changes to Skarb are documented here. The format follows
 - Transactions: search, filters (account, category, tag, uncategorized, internal transfers,
   investments), manual add / edit / delete, notes, tags. The tag filter takes several tags
   at once and matches transactions carrying any of them.
-- Tags page: per-tag spending over a period, in any display currency, sorted by what it
-  cost, linking through to the transactions behind each tag. Shows how much of the period's
-  spending carries no tag at all, and doubles as the place to rename, recolor or delete one.
+- Spending by tag: the overview's spending donut switches between categories and tags,
+  with the untagged remainder as its own slice and each tag linking to the transactions
+  behind it. Tags are renamed, recolored and deleted on the Categories page.
 - Internal transfer detection (own-IBAN match + opposite-amount pairs within 72 h) with
   manual override.
 - Investment tracking via investment-kind categories (Brokerage, Crypto seeded; IBKR rules).

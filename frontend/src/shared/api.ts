@@ -30,23 +30,13 @@ export type Dashboard = {
   prevMonth: { income: number; expense: number; invested: number }
   allTimeInvested: number
   spendingByCategory: { categoryId: string | null; name: string; emoji: string; color: string; amount: number }[]
+  spendingByTag: { tagId: string; name: string; color: string; amount: number }[]
+  /** This month's spending carrying no tag at all. */
+  untaggedSpending: number
+  /** Transactions this month wearing more than one tag — the reason tag slices can overlap. */
+  multiTagCount: number
   cashflow: { month: string; income: number; expense: number; invested: number }[]
   recent: Tx[]
-}
-
-export type TagSummaryRow = {
-  tag: Tag
-  /** Money out, investment contributions excluded — the same "spent" the dashboard reports. */
-  spent: number
-  earned: number
-  invested: number
-  transactionCount: number
-}
-export type TagSummary = {
-  currency: string
-  availableCurrencies: string[]
-  tags: TagSummaryRow[]
-  untagged: { spent: number; transactionCount: number }
 }
 
 export type Connection = {
@@ -151,12 +141,6 @@ export const api = {
   createTag: (body: { name: string; color?: string }) => post<Tag>('/api/tags', body),
   updateTag: (id: string, body: { name?: string; color?: string }) => patch<Tag>(`/api/tags/${id}`, body),
   deleteTag: (id: string) => del(`/api/tags/${id}`),
-  /** Per-tag totals over a period; `from`/`to` are inclusive yyyy-MM-dd days. */
-  tagSummary: (params: { currency?: string; from?: string; to?: string }) => {
-    const q = new URLSearchParams()
-    for (const [key, value] of Object.entries(params)) if (value) q.set(key, value)
-    return get<TagSummary>('/api/tags/summary?' + q)
-  },
 
   rules: () => get<Rule[]>('/api/rules'),
   createRule: (body: { pattern: string; categoryId: string; priority: number }) => post('/api/rules', body),

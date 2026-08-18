@@ -92,10 +92,14 @@ public class DashboardEndpoints : IEndpointGroup
             foreach (var row in investedRows)
                 allTimeInvested += await fx.ConvertAsync(-row.Sum, row.Currency, display); // outgoing = positive contribution
 
-            // Spending by category, current month (investments live in their own tile, not here).
-            var catRows = await db.Transactions
+            // Everything the month counts as spending — investments live in their own tile,
+            // not here. Both breakdowns below read from this one definition.
+            var monthSpending = db.Transactions
                 .Where(t => !t.IsExcluded && !t.IsInternal && t.Amount < 0 && t.OccurredAt >= monthStart &&
-                            (t.Category == null || t.Category.Kind != CategoryKinds.Investment))
+                            (t.Category == null || t.Category.Kind != CategoryKinds.Investment));
+
+            // Spending by category, current month.
+            var catRows = await monthSpending
                 .GroupBy(t => new { t.CategoryId, t.Currency })
                 .Select(g => new { g.Key.CategoryId, g.Key.Currency, Sum = g.Sum(t => t.Amount) })
                 .ToListAsync();
@@ -123,6 +127,38 @@ public class DashboardEndpoints : IEndpointGroup
                 .OrderByDescending(x => x.amount)
                 .ToList();
 
+            // Spending by tag, current month. A transaction wearing two tags counts under both,
+            // so these do not partition the month the way categories do — multiTagCount says how
+            // often that actually happens, and the UI owns up to it when it does.
+            var tagRows = await monthSpending
+                .SelectMany(t => t.Tags, (t, tag) => new { tag.Id, tag.Name, tag.Color, t.Currency, t.Amount })
+                .GroupBy(x => new { x.Id, x.Name, x.Color, x.Currency })
+                .Select(g => new { g.Key.Id, g.Key.Name, g.Key.Color, g.Key.Currency, Sum = g.Sum(x => x.Amount) })
+                .ToListAsync();
+            var byTag = new Dictionary<Guid, (string Name, string Color, decimal Amount)>();
+            foreach (var row in tagRows)
+            {
+                var v = await fx.ConvertAsync(-row.Sum, row.Currency, display);
+                var t = byTag.GetValueOrDefault(row.Id);
+                byTag[row.Id] = (row.Name, row.Color, t.Amount + v);
+            }
+            var spendingByTag = byTag
+                .Select(kv => new { tagId = kv.Key, name = kv.Value.Name, color = kv.Value.Color, amount = Math.Round(kv.Value.Amount, 2) })
+                .OrderByDescending(x => x.amount)
+                .ToList();
+
+            // What carries no tag at all — the honest remainder next to the tags above.
+            var untaggedRows = await monthSpending
+                .Where(t => !t.Tags.Any())
+                .GroupBy(t => t.Currency)
+                .Select(g => new { Currency = g.Key, Sum = g.Sum(t => t.Amount) })
+                .ToListAsync();
+            var untaggedSpending = 0m;
+            foreach (var row in untaggedRows)
+                untaggedSpending += await fx.ConvertAsync(-row.Sum, row.Currency, display);
+
+            var multiTagCount = await monthSpending.CountAsync(t => t.Tags.Count > 1);
+
             var recent = await db.Transactions
                 .Include(t => t.Account).Include(t => t.Category).Include(t => t.Tags)
                 .OrderByDescending(t => t.OccurredAt).ThenByDescending(t => t.CreatedAt)
@@ -145,6 +181,9 @@ public class DashboardEndpoints : IEndpointGroup
                 prevMonth = new { income = prevIncome, expense = prevExpense, invested = prevInvested },
                 allTimeInvested = Math.Round(allTimeInvested, 2),
                 spendingByCategory,
+                spendingByTag,
+                untaggedSpending = Math.Round(untaggedSpending, 2),
+                multiTagCount,
                 cashflow,
                 recent = recent.Select(t => t.ToDto()),
             };

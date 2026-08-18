@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
-import { api, refreshAll, type CategoryKind, type CategoryWithCount } from '../../shared/api'
+import { api, refreshAll, type CategoryKind, type CategoryWithCount, type Tag } from '../../shared/api'
 import { CATEGORY_COLORS, Card, CardHeader, CategoryDot, ColorPicker, Modal, ModalActions, btnPrimary, errMsg, fieldLabelCls, inputCls } from '../../shared/ui'
 
 const KIND_META: Record<CategoryKind, { title: string; blurb: string }> = {
@@ -67,6 +67,8 @@ export default function CategoriesPage() {
         )
       })}
 
+      <TagsCard />
+
       <RulesCard />
 
       {adding && (
@@ -85,6 +87,100 @@ export default function CategoriesPage() {
         />
       )}
     </div>
+  )
+}
+
+/**
+ * Tags live next to categories because they answer the same question one step finer.
+ * Attaching one happens in the transaction editor; this is where they get tidied up,
+ * and the overview reports what each one costs.
+ */
+function TagsCard() {
+  const { data: meta } = useQuery({ queryKey: ['meta'], queryFn: api.meta })
+  const [editing, setEditing] = useState<Tag | null>(null)
+  const [adding, setAdding] = useState(false)
+  const tags = meta?.tags ?? []
+
+  return (
+    <Card className="pb-4">
+      <CardHeader
+        title="Tags"
+        action={
+          <button onClick={() => setAdding(true)} className="flex items-center gap-1 text-sm font-medium text-muted hover:text-ink">
+            <Plus size={14} /> Add
+          </button>
+        }
+      />
+      <p className="px-5 pb-3 text-xs text-faint">
+        Free-form labels, finer than a category and stackable — #vacation, #renovation. Attach them
+        in the transaction editor; the overview reports what each one costs this month.
+      </p>
+      <div className="flex flex-wrap gap-2 px-5">
+        {tags.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setEditing(t)}
+            className="rounded-full px-3 py-1.5 text-sm font-medium transition-transform hover:scale-105"
+            style={{ background: t.color + '1f', color: t.color }}
+          >
+            #{t.name}
+          </button>
+        ))}
+        {tags.length === 0 && <p className="w-full py-2 text-sm text-faint">No tags yet.</p>}
+      </div>
+
+      {adding && <TagForm onClose={() => setAdding(false)} onSaved={() => setAdding(false)} />}
+      {editing && <TagForm tag={editing} onClose={() => setEditing(null)} onSaved={() => setEditing(null)} />}
+    </Card>
+  )
+}
+
+function TagForm({ tag, onClose, onSaved }: { tag?: Tag; onClose: () => void; onSaved: () => void }) {
+  const qc = useQueryClient()
+  const [name, setName] = useState(tag?.name ?? '')
+  const [color, setColor] = useState(tag?.color ?? CATEGORY_COLORS[0])
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const save = async () => {
+    setBusy(true)
+    setError('')
+    try {
+      if (!name.trim()) { setError('Give the tag a name.'); return }
+      if (tag) await api.updateTag(tag.id, { name: name.trim(), color })
+      else await api.createTag({ name: name.trim(), color })
+      refreshAll(qc)
+      onSaved()
+    } catch (e) {
+      setError(errMsg(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const remove = async () => {
+    if (!confirm(`Delete #${tag!.name}? Its transactions keep their history, they just lose the label.`)) return
+    await api.deleteTag(tag!.id)
+    refreshAll(qc)
+    onSaved()
+  }
+
+  return (
+    <Modal title={tag ? `Edit #${tag.name}` : 'New tag'} onClose={onClose}>
+      <div className="flex flex-col gap-3">
+        <label className="text-sm">
+          <span className={fieldLabelCls}>Name</span>
+          <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)}
+            placeholder="vacation" autoFocus />
+        </label>
+        <div className="text-sm">
+          <span className={fieldLabelCls}>Color</span>
+          <ColorPicker colors={CATEGORY_COLORS} value={color} onChange={setColor} />
+        </div>
+        {error && <p className="text-sm text-danger">{error}</p>}
+        <ModalActions busy={busy} onCancel={onClose} onSave={save} onDelete={tag ? remove : undefined} />
+      </div>
+    </Modal>
   )
 }
 

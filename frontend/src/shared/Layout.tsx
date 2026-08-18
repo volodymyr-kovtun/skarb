@@ -1,6 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { LayoutGrid, ArrowLeftRight, Wallet, Shapes, Tags, Settings, RefreshCw, LogOut } from 'lucide-react'
+import { LayoutGrid, ArrowLeftRight, Wallet, Shapes, Settings, RefreshCw, LogOut } from 'lucide-react'
 import { api } from './api'
 import { btnGhost } from './ui'
 
@@ -9,7 +9,6 @@ const nav = [
   { to: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
   { to: '/accounts', label: 'Accounts', icon: Wallet },
   { to: '/categories', label: 'Categories', icon: Shapes },
-  { to: '/tags', label: 'Tags', icon: Tags },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 

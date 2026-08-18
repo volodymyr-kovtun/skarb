@@ -10,7 +10,6 @@ import DashboardPage from './features/dashboard/DashboardPage'
 import TransactionsPage from './features/transactions/TransactionsPage'
 import AccountsPage from './features/accounts/AccountsPage'
 import CategoriesPage from './features/categories/CategoriesPage'
-import TagsPage from './features/tags/TagsPage'
 import SettingsPage from './features/settings/SettingsPage'
 
 // A session can lapse mid-visit. Whichever query notices first re-checks the session,
@@ -42,7 +41,6 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/transactions" element={<TransactionsPage />} />
               <Route path="/accounts" element={<AccountsPage />} />
               <Route path="/categories" element={<CategoriesPage />} />
-              <Route path="/tags" element={<TagsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>

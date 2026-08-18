@@ -9,6 +9,7 @@ import {
 import { api, fmtMoney } from '../../shared/api'
 import { Card, CardHeader, TxRow, labelCls } from '../../shared/ui'
 import { FAINT, INCOME, INK, INVESTED, SPEND, UNCATEGORIZED } from '../../shared/theme'
+import AccountsCard from './AccountsCard'
 
 /** Remembered so the overview opens in the currency you last read it in. */
 const CURRENCY_KEY = 'skarb.displayCurrency'
@@ -64,23 +65,9 @@ export default function DashboardPage() {
           )}
         </p>
 
-        {data.accounts.length > 0 && (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {data.accounts.map(({ account, balanceConverted }) => (
-              <Link
-                key={account.id}
-                to="/accounts"
-                title={`≈ ${fmtMoney(balanceConverted, cur)}`}
-                className="flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 text-sm shadow-card transition-colors hover:border-ink"
-              >
-                <span className="h-2 w-2 rounded-full" style={{ background: account.color }} />
-                <span className="font-medium">{account.bank || account.name}</span>
-                <span className="tnum text-muted">{fmtMoney(account.balance, account.currency)}</span>
-              </Link>
-            ))}
-          </div>
-        )}
       </div>
+
+      <AccountsCard rows={data.accounts} currency={cur} />
 
       {/* Month tiles */}
       <div className="grid grid-cols-4 gap-4">

@@ -2,12 +2,33 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Landmark } from 'lucide-react'
 import { api, fmtMoney, refreshAll, type Account } from '../../shared/api'
-import { ACCOUNT_COLORS, Card, ColorPicker, Modal, ModalActions, btnPrimary, errMsg, fieldLabelCls, inputCls } from '../../shared/ui'
+import { ACCOUNT_COLORS, Card, ColorPicker, Modal, ModalActions, bankLabel, btnPrimary, errMsg, fieldLabelCls, inputCls, labelCls } from '../../shared/ui'
 
 const providerLabel: Record<string, string> = {
   manual: 'Manual',
   monobank: 'Auto-synced',
   enablebanking: 'Auto-synced',
+}
+
+type Group = { label: string; accounts: Account[] }
+
+/** One section per institution, biggest first — the page stays short as accounts pile up. */
+function groupByBank(accounts: Account[]): Group[] {
+  const byLabel = new Map<string, Group>()
+  for (const a of accounts) {
+    const label = bankLabel(a)
+    const group = byLabel.get(label) ?? { label, accounts: [] }
+    group.accounts.push(a)
+    byLabel.set(label, group)
+  }
+  return [...byLabel.values()].sort((x, y) => y.accounts.length - x.accounts.length)
+}
+
+/** Only meaningful when a group holds a single currency — no exchange rates on this page. */
+function singleCurrencyTotal(accounts: Account[]) {
+  const currencies = new Set(accounts.map((a) => a.currency))
+  if (currencies.size !== 1) return null
+  return { currency: [...currencies][0], total: accounts.reduce((s, a) => s + a.balance, 0) }
 }
 
 export default function AccountsPage() {
@@ -40,26 +61,48 @@ export default function AccountsPage() {
         </Card>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
-        {active.map((a) => (
-          <button key={a.id} onClick={() => setEditing(a)} className="text-left">
-            <Card className="px-5 py-4 transition-shadow hover:shadow-pop">
-              <div className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ background: a.color }} />
-                <span className="text-sm font-semibold">{a.bank || 'Manual'}</span>
-                <span className="ml-auto rounded-md bg-paper px-2 py-0.5 text-[11px] font-medium text-muted">
-                  {providerLabel[a.provider] ?? a.provider}
-                </span>
+      {active.length > 0 && (
+        <Card className="pb-3">
+          {groupByBank(active).map((g, i) => {
+            const providers = [...new Set(g.accounts.map((a) => a.provider))]
+            const sum = singleCurrencyTotal(g.accounts)
+            return (
+              <div key={g.label} className={i > 0 ? 'mt-1 border-t border-line' : ''}>
+                <header className="flex items-baseline gap-2.5 px-5 pt-4 pb-1">
+                  <h2 className={labelCls}>{g.label}</h2>
+                  <span className="text-xs text-faint">
+                    {g.accounts.length} account{g.accounts.length === 1 ? '' : 's'}
+                    {providers.length === 1 && ` · ${providerLabel[providers[0]] ?? providers[0]}`}
+                  </span>
+                  {sum && (
+                    <span className="tnum ml-auto text-sm font-semibold">{fmtMoney(sum.total, sum.currency)}</span>
+                  )}
+                </header>
+                <div className="px-2">
+                  {g.accounts.map((a) => (
+                    <button
+                      key={a.id}
+                      onClick={() => setEditing(a)}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-paper"
+                    >
+                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: a.color }} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">{a.name}</span>
+                        <span className="block truncate text-xs text-faint">
+                          {a.currency}
+                          {a.maskedPan ? ` · ${a.maskedPan.slice(-8)}` : a.iban ? ` · …${a.iban.slice(-6)}` : ''}
+                          {providers.length > 1 && ` · ${providerLabel[a.provider] ?? a.provider}`}
+                        </span>
+                      </span>
+                      <span className="tnum text-sm font-semibold">{fmtMoney(a.balance, a.currency)}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
-              <p className="mt-3 font-display text-2xl font-bold tnum">{fmtMoney(a.balance, a.currency)}</p>
-              <p className="mt-1 truncate text-xs text-faint">
-                {a.name}
-                {a.maskedPan ? ` · ${a.maskedPan.slice(-8)}` : a.iban ? ` · …${a.iban.slice(-6)}` : ''}
-              </p>
-            </Card>
-          </button>
-        ))}
-      </div>
+            )
+          })}
+        </Card>
+      )}
 
       {archived.length > 0 && (
         <details className="px-1 text-sm text-muted">
@@ -69,7 +112,8 @@ export default function AccountsPage() {
               <button key={a.id} onClick={() => setEditing(a)}
                 className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-surface">
                 <span className="h-2 w-2 rounded-full" style={{ background: a.color }} />
-                {a.bank || a.name} <span className="tnum ml-auto">{fmtMoney(a.balance, a.currency)}</span>
+                <span className="truncate">{bankLabel(a)} · {a.name}</span>
+                <span className="tnum ml-auto">{fmtMoney(a.balance, a.currency)}</span>
               </button>
             ))}
           </div>

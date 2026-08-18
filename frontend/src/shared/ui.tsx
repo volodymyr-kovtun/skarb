@@ -9,6 +9,9 @@ export const labelCls = 'text-[13px] font-semibold uppercase tracking-[0.08em] t
 /** Label above a form input. */
 export const fieldLabelCls = 'mb-1 block text-xs font-medium text-muted'
 
+/** Institution an account is grouped under. Manual accounts have no bank of their own. */
+export const bankLabel = (a: { bank: string }) => a.bank || 'Manual'
+
 export function errMsg(e: unknown, fallback = 'Something went wrong') {
   return e instanceof Error ? e.message : fallback
 }

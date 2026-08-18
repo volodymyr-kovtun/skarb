@@ -23,7 +23,7 @@ public class TransactionEndpoints : IEndpointGroup
 
         group.MapGet("/", async (
             SkarbDbContext db,
-            Guid? accountId, Guid? categoryId, Guid? tagId, string? search,
+            Guid? accountId, Guid? categoryId, Guid[]? tagIds, string? search,
             DateTime? from, DateTime? to, bool? uncategorized, bool? internalOnly, bool? investmentsOnly,
             int page = 1, int pageSize = 50) =>
         {
@@ -33,7 +33,9 @@ public class TransactionEndpoints : IEndpointGroup
 
             if (accountId is Guid a) q = q.Where(t => t.AccountId == a);
             if (categoryId is Guid c) q = q.Where(t => t.CategoryId == c);
-            if (tagId is Guid tg) q = q.Where(t => t.Tags.Any(x => x.Id == tg));
+            // Several tags read as "any of these" — narrowing to transactions carrying all of
+            // them would return almost nothing, since a transaction rarely wears two labels.
+            if (tagIds is { Length: > 0 }) q = q.Where(t => t.Tags.Any(x => tagIds.Contains(x.Id)));
             if (uncategorized == true) q = q.Where(t => t.CategoryId == null && !t.IsInternal);
             if (internalOnly == true) q = q.Where(t => t.IsInternal);
             if (investmentsOnly == true) q = q.Where(t => t.Category != null && t.Category.Kind == CategoryKinds.Investment);

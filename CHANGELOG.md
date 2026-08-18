@@ -24,8 +24,9 @@ All notable changes to Skarb are documented here. The format follows
 - Accounts are grouped by institution on the overview (with an allocation bar and each
   group's share of net worth) and on the Accounts page, so the layout holds up with many
   accounts instead of growing a row of pills.
-- Transactions: search, filters (account, category, uncategorized, internal transfers,
-  investments), manual add / edit / delete, notes, tags.
+- Transactions: search, filters (account, category, tag, uncategorized, internal transfers,
+  investments), manual add / edit / delete, notes, tags. The tag filter takes several tags
+  at once and matches transactions carrying any of them.
 - Internal transfer detection (own-IBAN match + opposite-amount pairs within 72 h) with
   manual override.
 - Investment tracking via investment-kind categories (Brokerage, Crypto seeded; IBKR rules).

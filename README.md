@@ -32,8 +32,8 @@ Built for a PKO BP + ZEN + Monobank setup, but works with 2,500+ European banks.
 - **Investment tracking** — categories have a kind (*spending / income / investment*).
   Transfers to your broker (IB is pre-wired via `ibkr` / `interactive brokers` rules) count
   toward "Invested" — this month and all time — and never inflate your spending.
-- **Transactions** — search, filters (including *internal* and *investments* views), day
-  grouping, manual add/edit/delete, notes, tags
+- **Transactions** — search, filters (account, category, tag, plus *internal* and
+  *investments* views), day grouping, manual add/edit/delete, notes, tags
 - **Category management** — full CRUD with emoji, color and kind, usage counts, plus
   keyword auto-categorization rules and built-in MCC mapping for Monobank
 - **Bank sync**

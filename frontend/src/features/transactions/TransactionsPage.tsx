@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
-import { Plus, Search, X } from 'lucide-react'
-import { accountLabel, api, refreshAll, type Meta, type Tx } from '../../shared/api'
+import { ChevronDown, Plus, Search, Tag as TagIcon, X } from 'lucide-react'
+import { accountLabel, api, refreshAll, type Meta, type Tag, type Tx } from '../../shared/api'
 import { Card, Modal, ModalActions, TxRow, btnGhost, btnPrimary, dayLabel, errMsg, fieldLabelCls, inputCls } from '../../shared/ui'
 
 const SPECIAL_FILTERS = {
@@ -19,6 +19,7 @@ export default function TransactionsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [accountId, setAccountId] = useState('')
   const [categoryId, setCategoryId] = useState('')
+  const [tagIds, setTagIds] = useState<string[]>([])
   const [page, setPage] = useState(1)
   const [editing, setEditing] = useState<Tx | null>(null)
   const [adding, setAdding] = useState(false)
@@ -31,15 +32,16 @@ export default function TransactionsPage() {
   }, [search])
 
   const params = useMemo(() => {
-    const p: Record<string, string> = { page: String(page), pageSize: '50' }
+    const p: Record<string, string | string[]> = { page: String(page), pageSize: '50' }
     if (debouncedSearch) p.search = debouncedSearch
     if (accountId) p.accountId = accountId
+    if (tagIds.length) p.tagIds = tagIds
     if (categoryId === 'uncategorized') p.uncategorized = 'true'
     else if (categoryId === 'internal') p.internalOnly = 'true'
     else if (categoryId === 'investments') p.investmentsOnly = 'true'
     else if (categoryId) p.categoryId = categoryId
     return p
-  }, [debouncedSearch, accountId, categoryId, page])
+  }, [debouncedSearch, accountId, categoryId, tagIds, page])
 
   const { data } = useQuery({
     queryKey: ['transactions', params],
@@ -105,6 +107,11 @@ export default function TransactionsPage() {
           <option disabled>──────────</option>
           {meta?.categories.map((c) => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
         </select>
+        <TagFilter
+          tags={meta?.tags ?? []}
+          selected={tagIds}
+          onChange={(ids) => { setTagIds(ids); setPage(1) }}
+        />
       </Card>
 
       <Card className="px-2 py-2">
@@ -134,6 +141,74 @@ export default function TransactionsPage() {
       )}
       {editing && meta && (
         <TxForm meta={meta} tx={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); refresh() }} />
+      )}
+    </div>
+  )
+}
+
+/** Multi-select over the tags in use; picking several shows transactions carrying any of them. */
+function TagFilter({ tags, selected, onChange }:
+  { tags: Tag[]; selected: string[]; onChange: (ids: string[]) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    window.addEventListener('mousedown', onDown)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('mousedown', onDown)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  if (tags.length === 0) return null
+
+  const picked = tags.filter((t) => selected.includes(t.id))
+  const label = picked.length === 0 ? 'Tags'
+    : picked.length === 1 ? `#${picked[0].name}`
+    : `${picked.length} tags`
+
+  return (
+    <div className="relative shrink-0" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className={`flex h-10 items-center gap-1.5 rounded-xl px-3 text-sm font-medium transition-shadow ${
+          picked.length ? 'bg-paper text-ink shadow-[inset_0_0_0_1.5px_#131B2E]' : 'bg-paper text-muted hover:text-ink'}`}
+      >
+        <TagIcon size={14} />
+        <span className="max-w-32 truncate">{label}</span>
+        <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 z-30 mt-2 w-64 rounded-xl border border-line bg-surface p-3 shadow-pop">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-medium text-muted">Filter by tag</span>
+            {picked.length > 0 && (
+              <button onClick={() => onChange([])} className="text-xs font-medium text-muted hover:text-ink">Clear</button>
+            )}
+          </div>
+          <div className="flex max-h-64 flex-wrap gap-1.5 overflow-y-auto">
+            {tags.map((t) => {
+              const on = selected.includes(t.id)
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => onChange(on ? selected.filter((id) => id !== t.id) : [...selected, t.id])}
+                  aria-pressed={on}
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${on ? 'text-white' : 'text-muted hover:text-ink'}`}
+                  style={on ? { background: t.color } : { background: '#F4F5F7' }}
+                >
+                  #{t.name}
+                </button>
+              )
+            })}
+          </div>
+        </div>
       )}
     </div>
   )

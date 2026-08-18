@@ -101,8 +101,15 @@ export const api = {
   dashboard: (currency?: string) =>
     get<Dashboard>('/api/dashboard' + (currency ? `?currency=${currency}` : '')),
 
-  transactions: (params: Record<string, string>) =>
-    get<Paged<Tx>>('/api/transactions?' + new URLSearchParams(params)),
+  /** Array values are repeated (`tagIds=a&tagIds=b`), which is how the API reads a set. */
+  transactions: (params: Record<string, string | string[]>) => {
+    const q = new URLSearchParams()
+    for (const [key, value] of Object.entries(params)) {
+      if (Array.isArray(value)) value.forEach((v) => q.append(key, v))
+      else q.set(key, value)
+    }
+    return get<Paged<Tx>>('/api/transactions?' + q)
+  },
   createTransaction: (body: {
     accountId: string; amount: number; currency?: string; description: string
     categoryId: string | null; tagIds: string[]; occurredAt: string; note: string | null

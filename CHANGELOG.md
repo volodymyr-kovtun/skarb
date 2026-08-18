@@ -40,3 +40,5 @@ All notable changes to Skarb are documented here. The format follows
   and 2,500+ European banks), CSV import with ZEN / PKO presets.
 - Background auto-sync every 30 minutes and on-demand "Sync now".
 - PostgreSQL storage via Docker Compose, EF Core migrations, `make`-driven workflow.
+- Building the API builds the SPA into `wwwroot` when the frontend changed, so running from
+  an IDE or a bare `dotnet run` never serves a stale bundle (`-p:SkipSpa=true` opts out).

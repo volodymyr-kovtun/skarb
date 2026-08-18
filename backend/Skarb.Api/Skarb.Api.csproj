@@ -19,4 +19,32 @@
     <InternalsVisibleTo Include="Skarb.Api.Tests" />
   </ItemGroup>
 
+  <!--
+    The API serves the SPA out of wwwroot, so a stale wwwroot means the Run button shows
+    yesterday's UI. Build it as part of building the API — Rider, `dotnet run` and
+    `make run` all go through here. Only reruns when the frontend actually changed;
+    opt out with -p:SkipSpa=true when you want the backend alone.
+  -->
+  <PropertyGroup>
+    <SpaDir>$(MSBuildProjectDirectory)/../../frontend</SpaDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <SpaInput Include="$(SpaDir)/src/**/*;$(SpaDir)/index.html;$(SpaDir)/package.json;$(SpaDir)/vite.config.ts;$(SpaDir)/tsconfig*.json" />
+  </ItemGroup>
+
+  <Target Name="BuildSpa" BeforeTargets="Build"
+          Condition="'$(SkipSpa)' != 'true' And Exists('$(SpaDir)/node_modules')"
+          Inputs="@(SpaInput)" Outputs="$(MSBuildProjectDirectory)/wwwroot/index.html">
+    <Exec Command="npm run build" WorkingDirectory="$(SpaDir)" />
+  </Target>
+
+  <!-- Saying so beats silently serving an old bundle. CI hits this: it builds the
+       backend before `npm ci` and builds the SPA in a step of its own. -->
+  <Target Name="ReportMissingSpaDeps" BeforeTargets="Build"
+          Condition="'$(SkipSpa)' != 'true' And !Exists('$(SpaDir)/node_modules')">
+    <Message Importance="high"
+             Text="Skipping the SPA build: frontend/node_modules is missing, so wwwroot keeps whatever was built last. Run `make install` to change that." />
+  </Target>
+
 </Project>

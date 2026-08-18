@@ -73,6 +73,14 @@ Open-banking providers require an `https://` redirect URL, which is why HTTPS is
 | `make install` | dotnet restore + npm install + trust the HTTPS dev cert |
 | `make https-trust` | (Re)trust the localhost HTTPS certificate |
 
+Building the API builds the SPA into `wwwroot` first — and only when the frontend actually
+changed — so Rider's Run button, `dotnet run` and `make run` all serve the current UI instead
+of whatever was built last. `-p:SkipSpa=true` skips it when you want the backend alone, and a
+missing `frontend/node_modules` skips it with a message rather than failing the build.
+
+While working on the frontend, prefer `make dev` and http://localhost:5173: Vite hot-reloads
+and proxies `/api` to the backend, so nothing has to be rebuilt at all.
+
 ### Database
 
 - Connection string lives in `backend/Skarb.Api/appsettings.json`

@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
@@ -7,15 +6,13 @@ import {
   PieChart, Pie, Cell,
 } from 'recharts'
 import { api, fmtMoney } from '../../shared/api'
-import { Card, CardHeader, TxRow, labelCls } from '../../shared/ui'
+import { Card, CardHeader, CurrencySwitch, TxRow, labelCls } from '../../shared/ui'
+import { useDisplayCurrency } from '../../shared/currency'
 import { FAINT, INCOME, INK, INVESTED, SPEND, UNCATEGORIZED } from '../../shared/theme'
 import AccountsCard from './AccountsCard'
 
-/** Remembered so the overview opens in the currency you last read it in. */
-const CURRENCY_KEY = 'skarb.displayCurrency'
-
 export default function DashboardPage() {
-  const [currency, setCurrency] = useState(() => localStorage.getItem(CURRENCY_KEY) ?? '')
+  const [currency, pickCurrency] = useDisplayCurrency()
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard', currency],
     queryFn: () => api.dashboard(currency || undefined),
@@ -23,11 +20,6 @@ export default function DashboardPage() {
     // shouldn't blank the page.
     placeholderData: (prev) => prev,
   })
-
-  const pickCurrency = (c: string) => {
-    localStorage.setItem(CURRENCY_KEY, c)
-    setCurrency(c)
-  }
 
   if (isLoading || !data) return <p className="py-20 text-center text-sm text-faint">Loading your money…</p>
 
@@ -160,32 +152,6 @@ export default function DashboardPage() {
           )}
         </div>
       </Card>
-    </div>
-  )
-}
-
-/** Reports the whole overview in another currency, converted at today's rates. */
-function CurrencySwitch({ value, options, onChange }:
-  { value: string; options: string[]; onChange: (c: string) => void }) {
-  if (options.length < 2) return null
-  return (
-    <div
-      className="flex items-center gap-0.5 rounded-full bg-paper p-1"
-      role="group"
-      aria-label="Display currency"
-      title="Everything below is converted to this currency at today's rates"
-    >
-      {options.map((c) => (
-        <button
-          key={c}
-          onClick={() => onChange(c)}
-          aria-pressed={value === c}
-          className={`rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide transition-colors ${
-            value === c ? 'bg-surface text-ink shadow-card' : 'text-muted hover:text-ink'}`}
-        >
-          {c}
-        </button>
-      ))}
     </div>
   )
 }

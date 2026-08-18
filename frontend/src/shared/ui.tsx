@@ -33,6 +33,41 @@ export function CardHeader({ title, action }: { title: string; action?: ReactNod
   )
 }
 
+/** Compact pill switcher — display currency, report periods. */
+export function Segmented({ value, options, onChange, label, title }:
+  { value: string; options: { value: string; label: string }[]; onChange: (v: string) => void; label: string; title?: string }) {
+  if (options.length < 2) return null
+  return (
+    <div className="flex items-center gap-0.5 rounded-full bg-paper p-1" role="group" aria-label={label} title={title}>
+      {options.map((o) => (
+        <button
+          key={o.value}
+          onClick={() => onChange(o.value)}
+          aria-pressed={value === o.value}
+          className={`rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide transition-colors ${
+            value === o.value ? 'bg-surface text-ink shadow-card' : 'text-muted hover:text-ink'}`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** Reports a whole page in another currency, converted at today's rates. */
+export function CurrencySwitch({ value, options, onChange }:
+  { value: string; options: string[]; onChange: (c: string) => void }) {
+  return (
+    <Segmented
+      value={value}
+      options={options.map((c) => ({ value: c, label: c }))}
+      onChange={onChange}
+      label="Display currency"
+      title="Converted to this currency at today's rates"
+    />
+  )
+}
+
 export function Money({ amount, currency, signed = false, muted = false, className = '' }:
   { amount: number; currency: string; signed?: boolean; muted?: boolean; className?: string }) {
   const color = muted ? 'text-faint' : signed && amount > 0 ? 'text-income' : 'text-ink'

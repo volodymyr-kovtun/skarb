@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { ChevronDown, Plus, Search, Tag as TagIcon, X } from 'lucide-react'
 import { accountLabel, api, refreshAll, type Meta, type Tag, type Tx } from '../../shared/api'
@@ -19,7 +20,9 @@ export default function TransactionsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [accountId, setAccountId] = useState('')
   const [categoryId, setCategoryId] = useState('')
-  const [tagIds, setTagIds] = useState<string[]>([])
+  // Followed in from the Tags page: ?tags=<id> starts the filter where the link pointed.
+  const [searchParams] = useSearchParams()
+  const [tagIds, setTagIds] = useState<string[]>(() => searchParams.getAll('tags'))
   const [page, setPage] = useState(1)
   const [editing, setEditing] = useState<Tx | null>(null)
   const [adding, setAdding] = useState(false)

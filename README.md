@@ -36,6 +36,9 @@ Built for a PKO BP + ZEN + Monobank setup, but works with 2,500+ European banks.
   *investments* views), day grouping, manual add/edit/delete, notes, tags
 - **Category management** — full CRUD with emoji, color and kind, usage counts, plus
   keyword auto-categorization rules and built-in MCC mapping for Monobank
+- **Tags page** — what each label cost you over a period (this / last month, this year,
+  all time), in any display currency, with the untagged remainder spelled out. A tag row
+  opens the transactions behind it; tags can be renamed, recolored and deleted here.
 - **Bank sync**
   - **Monobank** — direct personal API; instant push sync via webhook (optional)
   - **PKO BP + any Enable Banking bank** — the picker lists every supported institution

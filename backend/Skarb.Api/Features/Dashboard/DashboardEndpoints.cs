@@ -3,17 +3,12 @@ using Skarb.Api.Common.Abstractions;
 using Skarb.Api.Common.Contracts;
 using Skarb.Api.Common.Domain;
 using Skarb.Api.Common.Persistence;
+using Skarb.Api.Common.Services;
 
 namespace Skarb.Api.Features.Dashboard;
 
 public class DashboardEndpoints : IEndpointGroup
 {
-    /// <summary>
-    /// Always offered in the currency switcher, on top of the base currency and whatever
-    /// the accounts themselves are held in.
-    /// </summary>
-    private static readonly string[] AlwaysOffered = ["PLN", "EUR", "USD"];
-
     public void Map(IEndpointRouteBuilder app)
     {
         app.MapGet("/api/dashboard", async (SkarbDbContext db, IExchangeRateService fx, string? currency, int months = 6) =>
@@ -28,7 +23,7 @@ public class DashboardEndpoints : IEndpointGroup
 
             // Everything on this page is reported in one currency of the reader's choosing;
             // an unknown or missing request falls back to the configured base.
-            var display = await ResolveCurrencyAsync(fx, currency);
+            var display = await DisplayCurrency.ResolveAsync(fx, currency);
 
             // Net worth across accounts, converted to the display currency.
             var accounts = await db.Accounts.Where(a => !a.IsArchived).OrderBy(a => a.CreatedAt).ToListAsync();
@@ -137,7 +132,7 @@ public class DashboardEndpoints : IEndpointGroup
             {
                 currency = display,
                 baseCurrency = fx.BaseCurrency,
-                availableCurrencies = await AvailableCurrenciesAsync(fx, accounts),
+                availableCurrencies = await DisplayCurrency.OptionsAsync(fx, accounts.Select(a => a.Currency)),
                 netWorth = Math.Round(netWorth, 2),
                 accounts = accountDtos,
                 month = new
@@ -154,25 +149,5 @@ public class DashboardEndpoints : IEndpointGroup
                 recent = recent.Select(t => t.ToDto()),
             };
         });
-    }
-
-    /// <summary>Unknown or missing input falls back to the base currency, so a stale bookmark still renders.</summary>
-    private static async Task<string> ResolveCurrencyAsync(IExchangeRateService fx, string? requested)
-    {
-        if (string.IsNullOrWhiteSpace(requested)) return fx.BaseCurrency;
-        var code = requested.Trim().ToUpperInvariant();
-        return code.Length == 3 && await fx.IsKnownAsync(code) ? code : fx.BaseCurrency;
-    }
-
-    /// <summary>What the currency switcher offers: base first, then the account currencies, then the majors.</summary>
-    private static async Task<List<string>> AvailableCurrenciesAsync(IExchangeRateService fx, List<Account> accounts)
-    {
-        var codes = new List<string> { fx.BaseCurrency.ToUpperInvariant() };
-        foreach (var raw in accounts.Select(a => a.Currency).Concat(AlwaysOffered))
-        {
-            var code = raw.ToUpperInvariant();
-            if (!codes.Contains(code) && await fx.IsKnownAsync(code)) codes.Add(code);
-        }
-        return codes;
     }
 }

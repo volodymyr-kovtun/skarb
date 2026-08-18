@@ -34,6 +34,21 @@ export type Dashboard = {
   recent: Tx[]
 }
 
+export type TagSummaryRow = {
+  tag: Tag
+  /** Money out, investment contributions excluded — the same "spent" the dashboard reports. */
+  spent: number
+  earned: number
+  invested: number
+  transactionCount: number
+}
+export type TagSummary = {
+  currency: string
+  availableCurrencies: string[]
+  tags: TagSummaryRow[]
+  untagged: { spent: number; transactionCount: number }
+}
+
 export type Connection = {
   id: string; provider: string; displayName: string; status: string
   lastSyncedAt: string | null; lastError: string | null
@@ -134,6 +149,14 @@ export const api = {
     patch<Category>(`/api/categories/${id}`, body),
   deleteCategory: (id: string) => del(`/api/categories/${id}`),
   createTag: (body: { name: string; color?: string }) => post<Tag>('/api/tags', body),
+  updateTag: (id: string, body: { name?: string; color?: string }) => patch<Tag>(`/api/tags/${id}`, body),
+  deleteTag: (id: string) => del(`/api/tags/${id}`),
+  /** Per-tag totals over a period; `from`/`to` are inclusive yyyy-MM-dd days. */
+  tagSummary: (params: { currency?: string; from?: string; to?: string }) => {
+    const q = new URLSearchParams()
+    for (const [key, value] of Object.entries(params)) if (value) q.set(key, value)
+    return get<TagSummary>('/api/tags/summary?' + q)
+  },
 
   rules: () => get<Rule[]>('/api/rules'),
   createRule: (body: { pattern: string; categoryId: string; priority: number }) => post('/api/rules', body),

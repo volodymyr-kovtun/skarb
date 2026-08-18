@@ -91,3 +91,55 @@ every number on the overview gets a little less true.
   perhaps the offer is simply to run it.
 - Is there a point where a merchant with no obvious category should be allowed
   to stay uncategorized permanently, instead of being asked about forever?
+
+---
+
+## Shared expenses and reimbursements
+
+**What.** When you front a bill and people pay you back, Skarb should count what you
+actually spent. You pay $500 for dinner, friend A sends $100 and friend B sends $150 —
+the restaurant cost you $250, and that is the number every chart should show.
+
+**Why.** Today it shows $500, and the $250 coming back is counted as income on top. The
+outgoing lands in Eating out at its full size; the two repayments are recognised as P2P
+transfers and filed under *Transfers from people*, which is an income-kind category. So a
+single dinner inflates the month twice: spending by $250 and earnings by $250. The
+spending donut then says restaurants cost double what they did, which is exactly the
+number you would use to decide whether to eat out less.
+
+Neither existing escape hatch fixes it. Excluding the two repayments stops the phantom
+income but leaves the $500 standing. Excluding the dinner hides $250 of real spending. And
+the amount cannot simply be edited down, deliberately — on a synced transaction it is the
+bank's number, and the ledger is worth more when it matches the statement.
+
+**How, roughly.**
+
+- A link from a repayment to the expense it repays. This is structurally what
+  `TransferGroupId` already does for the two legs of an internal transfer, so both the
+  data shape and the "these belong together" affordance have a precedent to follow.
+- The expense reports **net of what came back**, while still showing the bank's amount —
+  `−$500, $250 settled`. The repayments stop counting as income, because they never were:
+  that money was always yours.
+- Suggest the link rather than requiring it. An incoming P2P transfer, smaller than an
+  expense from the last few days, is nearly always a repayment — and P2P is already
+  detected (`transfers-in`). Internal-transfer detection sets the pattern: propose the
+  match, mark it, let the user un-mark it.
+- Optionally mark an expense as shared when it lands, with the share you expect back, so
+  the outstanding amount is visible before anyone has paid.
+
+**Open questions.**
+
+- **Which month absorbs it?** Dinner in August, repaid in September. Netting it into
+  August silently rewrites a month you have already read and reasoned about; netting it
+  into September can push a category below zero. Accounting has argued about this for
+  centuries and neither answer is free — pick one deliberately and say which it is.
+- What if only one friend pays, or nobody does? The unsettled part has to stay your
+  spending, which argues for netting as money arrives rather than promising a share
+  up front.
+- Should a repayment inherit the expense's category, so the netting happens inside
+  *Eating out* rather than as a separate line that has to be mentally subtracted?
+- Cash never shows up in a bank feed. Does this need a manual "settled in cash" that
+  writes down part of the expense with no matching transaction?
+- Where does it stop? Tracking what each person owes you over time is Splitwise's job.
+  The line worth holding is that Skarb reports **your** money honestly — it is not a
+  ledger of other people's debts.

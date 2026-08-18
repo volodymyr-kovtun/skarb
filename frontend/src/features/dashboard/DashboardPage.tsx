@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
@@ -9,12 +10,27 @@ import { api, fmtMoney } from '../../shared/api'
 import { Card, CardHeader, TxRow, labelCls } from '../../shared/ui'
 import { FAINT, INCOME, INK, INVESTED, SPEND, UNCATEGORIZED } from '../../shared/theme'
 
+/** Remembered so the overview opens in the currency you last read it in. */
+const CURRENCY_KEY = 'skarb.displayCurrency'
+
 export default function DashboardPage() {
-  const { data, isLoading } = useQuery({ queryKey: ['dashboard'], queryFn: api.dashboard })
+  const [currency, setCurrency] = useState(() => localStorage.getItem(CURRENCY_KEY) ?? '')
+  const { data, isLoading } = useQuery({
+    queryKey: ['dashboard', currency],
+    queryFn: () => api.dashboard(currency || undefined),
+    // Keep the previous currency on screen while the next one loads — switching
+    // shouldn't blank the page.
+    placeholderData: (prev) => prev,
+  })
+
+  const pickCurrency = (c: string) => {
+    localStorage.setItem(CURRENCY_KEY, c)
+    setCurrency(c)
+  }
 
   if (isLoading || !data) return <p className="py-20 text-center text-sm text-faint">Loading your money…</p>
 
-  const cur = data.baseCurrency
+  const cur = data.currency
   const flow = data.cashflow.map((m) => ({ ...m, label: format(parseISO(m.month + '-01'), 'MMM') }))
   const topCats = data.spendingByCategory.slice(0, 6)
   const otherSum = data.spendingByCategory.slice(6).reduce((s, c) => s + c.amount, 0)
@@ -27,7 +43,10 @@ export default function DashboardPage() {
     <div className="flex flex-col gap-5">
       {/* Hero: net worth */}
       <div className="px-1 pt-2">
-        <p className={labelCls}>Net worth</p>
+        <div className="flex items-center justify-between gap-4">
+          <p className={labelCls}>Net worth</p>
+          <CurrencySwitch value={cur} options={data.availableCurrencies} onChange={pickCurrency} />
+        </div>
         <div className="mt-1 flex items-end gap-4">
           <h1 className="font-display text-5xl font-bold tracking-tight tnum">
             {fmtMoney(data.netWorth, cur)}
@@ -47,11 +66,11 @@ export default function DashboardPage() {
 
         {data.accounts.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-2">
-            {data.accounts.map(({ account, balanceBase }) => (
+            {data.accounts.map(({ account, balanceConverted }) => (
               <Link
                 key={account.id}
                 to="/accounts"
-                title={`≈ ${fmtMoney(balanceBase, cur)}`}
+                title={`≈ ${fmtMoney(balanceConverted, cur)}`}
                 className="flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 text-sm shadow-card transition-colors hover:border-ink"
               >
                 <span className="h-2 w-2 rounded-full" style={{ background: account.color }} />
@@ -154,6 +173,32 @@ export default function DashboardPage() {
           )}
         </div>
       </Card>
+    </div>
+  )
+}
+
+/** Reports the whole overview in another currency, converted at today's rates. */
+function CurrencySwitch({ value, options, onChange }:
+  { value: string; options: string[]; onChange: (c: string) => void }) {
+  if (options.length < 2) return null
+  return (
+    <div
+      className="flex items-center gap-0.5 rounded-full bg-paper p-1"
+      role="group"
+      aria-label="Display currency"
+      title="Everything below is converted to this currency at today's rates"
+    >
+      {options.map((c) => (
+        <button
+          key={c}
+          onClick={() => onChange(c)}
+          aria-pressed={value === c}
+          className={`rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide transition-colors ${
+            value === c ? 'bg-surface text-ink shadow-card' : 'text-muted hover:text-ink'}`}
+        >
+          {c}
+        </button>
+      ))}
     </div>
   )
 }

@@ -19,6 +19,8 @@ All notable changes to Skarb are documented here. The format follows
   Banking tier does and does not permit.
 - Dashboard: net worth across currencies, monthly earned / spent / invested / net,
   6-month cashflow chart, spending-by-category donut, recent activity.
+- Dashboard currency switcher: every converted figure on the overview can be read in any
+  account currency (plus EUR/USD), remembered between visits.
 - Transactions: search, filters (account, category, uncategorized, internal transfers,
   investments), manual add / edit / delete, notes, tags.
 - Internal transfer detection (own-IBAN match + opposite-amount pairs within 72 h) with

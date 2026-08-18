@@ -67,11 +67,17 @@ public interface ITransferDetector
     Task<int> DetectAsync(CancellationToken ct);
 }
 
-/// <summary>Converts amounts into the app's base currency.</summary>
+/// <summary>Converts amounts between currencies.</summary>
 public interface IExchangeRateService
 {
+    /// <summary>Currency the app falls back to when none is requested.</summary>
     string BaseCurrency { get; }
-    Task<decimal> ToBaseAsync(decimal amount, string currency, CancellationToken ct = default);
+
+    /// <summary>Converts between any two currencies with known rates; returns the amount unchanged otherwise.</summary>
+    Task<decimal> ConvertAsync(decimal amount, string from, string to, CancellationToken ct = default);
+
+    /// <summary>True when the currency has a known rate, i.e. amounts in it can be converted.</summary>
+    Task<bool> IsKnownAsync(string currency, CancellationToken ct = default);
 }
 
 /// <summary>Triggers and tracks background syncs across bank connections.</summary>

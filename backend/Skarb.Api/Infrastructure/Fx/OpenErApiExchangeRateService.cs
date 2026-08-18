@@ -6,7 +6,8 @@ namespace Skarb.Api.Infrastructure.Fx;
 
 /// <summary>
 /// IExchangeRateService backed by open.er-api.com (no API key), cached per
-/// FxOptions.CacheHours with a static fallback when offline.
+/// FxOptions.CacheHours with a static fallback when offline. One rate table is
+/// fetched (units per 1 base currency), so any pair converts through the base.
 /// </summary>
 public class OpenErApiExchangeRateService(
     IHttpClientFactory httpFactory,
@@ -28,13 +29,29 @@ public class OpenErApiExchangeRateService(
 
     public string BaseCurrency => options.Value.BaseCurrency;
 
-    public async Task<decimal> ToBaseAsync(decimal amount, string currency, CancellationToken ct = default)
+    public async Task<decimal> ConvertAsync(decimal amount, string from, string to, CancellationToken ct = default)
     {
-        if (string.Equals(currency, BaseCurrency, StringComparison.OrdinalIgnoreCase)) return amount;
+        if (string.Equals(from, to, StringComparison.OrdinalIgnoreCase)) return amount;
         var rates = await GetRatesAsync(ct);
-        return rates.TryGetValue(currency, out var perBase) && perBase != 0
-            ? Math.Round(amount / perBase, 2)
-            : amount;
+        if (!TryRate(rates, from, out var perBaseFrom) || !TryRate(rates, to, out var perBaseTo)) return amount;
+        return Math.Round(amount / perBaseFrom * perBaseTo, 2);
+    }
+
+    public async Task<bool> IsKnownAsync(string currency, CancellationToken ct = default) =>
+        TryRate(await GetRatesAsync(ct), currency, out _);
+
+    /// <summary>
+    /// Units of <paramref name="currency"/> per 1 base currency. The base itself is 1 even when
+    /// the table omits it, which is what keeps a non-PLN base working on the fallback rates.
+    /// </summary>
+    private bool TryRate(Dictionary<string, decimal> rates, string currency, out decimal perBase)
+    {
+        if (string.Equals(currency, BaseCurrency, StringComparison.OrdinalIgnoreCase))
+        {
+            perBase = 1m;
+            return true;
+        }
+        return rates.TryGetValue(currency, out perBase) && perBase != 0;
     }
 
     private async Task<Dictionary<string, decimal>> GetRatesAsync(CancellationToken ct)

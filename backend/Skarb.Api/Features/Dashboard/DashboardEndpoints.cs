@@ -8,9 +8,15 @@ namespace Skarb.Api.Features.Dashboard;
 
 public class DashboardEndpoints : IEndpointGroup
 {
+    /// <summary>
+    /// Always offered in the currency switcher, on top of the base currency and whatever
+    /// the accounts themselves are held in.
+    /// </summary>
+    private static readonly string[] AlwaysOffered = ["PLN", "EUR", "USD"];
+
     public void Map(IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/dashboard", async (SkarbDbContext db, IExchangeRateService fx, int months = 6) =>
+        app.MapGet("/api/dashboard", async (SkarbDbContext db, IExchangeRateService fx, string? currency, int months = 6) =>
         {
             var now = DateTime.UtcNow;
             var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -20,15 +26,19 @@ public class DashboardEndpoints : IEndpointGroup
             var windowStart = monthStart.AddMonths(-Math.Max(months - 1, 1));
             var chartStart = monthStart.AddMonths(-(months - 1));
 
-            // Net worth across accounts, converted to base currency.
+            // Everything on this page is reported in one currency of the reader's choosing;
+            // an unknown or missing request falls back to the configured base.
+            var display = await ResolveCurrencyAsync(fx, currency);
+
+            // Net worth across accounts, converted to the display currency.
             var accounts = await db.Accounts.Where(a => !a.IsArchived).OrderBy(a => a.CreatedAt).ToListAsync();
             var netWorth = 0m;
             var accountDtos = new List<object>();
             foreach (var a in accounts)
             {
-                var converted = await fx.ToBaseAsync(a.Balance, a.Currency);
+                var converted = await fx.ConvertAsync(a.Balance, a.Currency, display);
                 netWorth += converted;
-                accountDtos.Add(new { account = a.ToDto(), balanceBase = converted });
+                accountDtos.Add(new { account = a.ToDto(), balanceConverted = converted });
             }
 
             // Money flows grouped in SQL by month + currency + direction + investment-ness.
@@ -57,7 +67,7 @@ public class DashboardEndpoints : IEndpointGroup
                 decimal income = 0, expense = 0, invested = 0;
                 foreach (var row in flowRows.Where(r => r.Year == d.Year && r.Month == d.Month))
                 {
-                    var v = await fx.ToBaseAsync(Math.Abs(row.Sum), row.Currency);
+                    var v = await fx.ConvertAsync(Math.Abs(row.Sum), row.Currency, display);
                     if (row.IsInvestment) invested += row.IsIncome ? -v : v; // withdrawals reduce invested
                     else if (row.IsIncome) income += v;
                     else expense += v;
@@ -85,7 +95,7 @@ public class DashboardEndpoints : IEndpointGroup
                 .ToListAsync();
             var allTimeInvested = 0m;
             foreach (var row in investedRows)
-                allTimeInvested += await fx.ToBaseAsync(-row.Sum, row.Currency); // outgoing = positive contribution
+                allTimeInvested += await fx.ConvertAsync(-row.Sum, row.Currency, display); // outgoing = positive contribution
 
             // Spending by category, current month (investments live in their own tile, not here).
             var catRows = await db.Transactions
@@ -99,7 +109,7 @@ public class DashboardEndpoints : IEndpointGroup
             foreach (var row in catRows)
             {
                 var key = row.CategoryId ?? Guid.Empty;
-                var v = await fx.ToBaseAsync(-row.Sum, row.Currency);
+                var v = await fx.ConvertAsync(-row.Sum, row.Currency, display);
                 byCategory[key] = byCategory.GetValueOrDefault(key) + v;
             }
             var spendingByCategory = byCategory
@@ -125,7 +135,9 @@ public class DashboardEndpoints : IEndpointGroup
 
             return new
             {
+                currency = display,
                 baseCurrency = fx.BaseCurrency,
+                availableCurrencies = await AvailableCurrenciesAsync(fx, accounts),
                 netWorth = Math.Round(netWorth, 2),
                 accounts = accountDtos,
                 month = new
@@ -142,5 +154,25 @@ public class DashboardEndpoints : IEndpointGroup
                 recent = recent.Select(t => t.ToDto()),
             };
         });
+    }
+
+    /// <summary>Unknown or missing input falls back to the base currency, so a stale bookmark still renders.</summary>
+    private static async Task<string> ResolveCurrencyAsync(IExchangeRateService fx, string? requested)
+    {
+        if (string.IsNullOrWhiteSpace(requested)) return fx.BaseCurrency;
+        var code = requested.Trim().ToUpperInvariant();
+        return code.Length == 3 && await fx.IsKnownAsync(code) ? code : fx.BaseCurrency;
+    }
+
+    /// <summary>What the currency switcher offers: base first, then the account currencies, then the majors.</summary>
+    private static async Task<List<string>> AvailableCurrenciesAsync(IExchangeRateService fx, List<Account> accounts)
+    {
+        var codes = new List<string> { fx.BaseCurrency.ToUpperInvariant() };
+        foreach (var raw in accounts.Select(a => a.Currency).Concat(AlwaysOffered))
+        {
+            var code = raw.ToUpperInvariant();
+            if (!codes.Contains(code) && await fx.IsKnownAsync(code)) codes.Add(code);
+        }
+        return codes;
     }
 }

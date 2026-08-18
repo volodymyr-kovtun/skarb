@@ -20,9 +20,12 @@ export type Meta = { accounts: Account[]; categories: Category[]; tags: Tag[] }
 export type Paged<T> = { items: T[]; total: number; page: number; pageSize: number }
 
 export type Dashboard = {
+  /** Currency every converted number on the dashboard is reported in. */
+  currency: string
   baseCurrency: string
+  availableCurrencies: string[]
   netWorth: number
-  accounts: { account: Account; balanceBase: number }[]
+  accounts: { account: Account; balanceConverted: number }[]
   month: { income: number; expense: number; invested: number; net: number }
   prevMonth: { income: number; expense: number; invested: number }
   allTimeInvested: number
@@ -95,7 +98,8 @@ export const api = {
   recoveryCodesLeft: () => get<{ remaining: number }>('/api/auth/recovery-codes/remaining'),
 
   meta: () => get<Meta>('/api/meta'),
-  dashboard: () => get<Dashboard>('/api/dashboard'),
+  dashboard: (currency?: string) =>
+    get<Dashboard>('/api/dashboard' + (currency ? `?currency=${currency}` : '')),
 
   transactions: (params: Record<string, string>) =>
     get<Paged<Tx>>('/api/transactions?' + new URLSearchParams(params)),

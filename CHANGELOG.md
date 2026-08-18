@@ -17,6 +17,7 @@ All notable changes to Skarb are documented here. The format follows
 - Settings → Security: change password, view two-factor status, regenerate recovery codes.
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — deploying safely, and what the free Enable
   Banking tier does and does not permit.
+- [docs/BACKLOG.md](docs/BACKLOG.md) — features worth building that are not built yet.
 - Dashboard: net worth across currencies, monthly earned / spent / invested / net,
   6-month cashflow chart, spending-by-category donut, recent activity.
 - Dashboard currency switcher: every converted figure on the overview can be read in any

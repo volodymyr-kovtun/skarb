@@ -172,6 +172,8 @@ See [SECURITY.md](SECURITY.md) for the threat model and how to report vulnerabil
 
 ## Contributing
 
+What is planned but not built yet lives in [docs/BACKLOG.md](docs/BACKLOG.md).
+
 Bug reports, bank presets and new providers are welcome — see
 [CONTRIBUTING.md](CONTRIBUTING.md). Please follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 

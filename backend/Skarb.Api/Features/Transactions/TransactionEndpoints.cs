@@ -25,7 +25,7 @@ public class TransactionEndpoints : IEndpointGroup
             SkarbDbContext db,
             Guid? accountId, Guid? categoryId, Guid[]? tagIds, string? search,
             DateTime? from, DateTime? to, bool? uncategorized, bool? internalOnly, bool? investmentsOnly,
-            int page = 1, int pageSize = 50) =>
+            bool? hideInternal, int page = 1, int pageSize = 50) =>
         {
             var q = db.Transactions
                 .Include(t => t.Account).Include(t => t.Category).Include(t => t.Tags)
@@ -38,6 +38,9 @@ public class TransactionEndpoints : IEndpointGroup
             if (tagIds is { Length: > 0 }) q = q.Where(t => t.Tags.Any(x => tagIds.Contains(x.Id)));
             if (uncategorized == true) q = q.Where(t => t.CategoryId == null && !t.IsInternal);
             if (internalOnly == true) q = q.Where(t => t.IsInternal);
+            // Transfers between the owner's own accounts are noise once you're reading the
+            // list as a spending log, so they can be dropped without touching any other filter.
+            else if (hideInternal == true) q = q.Where(t => !t.IsInternal);
             if (investmentsOnly == true) q = q.Where(t => t.Category != null && t.Category.Kind == CategoryKinds.Investment);
             if (from is DateTime f) q = q.Where(t => t.OccurredAt >= DateTime.SpecifyKind(f, DateTimeKind.Utc));
             if (to is DateTime to_) q = q.Where(t => t.OccurredAt < DateTime.SpecifyKind(to_, DateTimeKind.Utc).AddDays(1));

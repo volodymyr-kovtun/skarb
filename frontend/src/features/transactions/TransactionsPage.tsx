@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
-import { ChevronDown, Plus, Search, Tag as TagIcon, X } from 'lucide-react'
+import { ArrowLeftRight, ChevronDown, Plus, Search, Tag as TagIcon, X } from 'lucide-react'
 import { accountLabel, api, refreshAll, type Meta, type Tag, type Tx } from '../../shared/api'
 import { Card, Modal, ModalActions, TxRow, btnGhost, btnPrimary, dayLabel, errMsg, fieldLabelCls, inputCls } from '../../shared/ui'
 
@@ -23,6 +23,7 @@ export default function TransactionsPage() {
   // Followed in from the Tags page: ?tags=<id> starts the filter where the link pointed.
   const [searchParams] = useSearchParams()
   const [tagIds, setTagIds] = useState<string[]>(() => searchParams.getAll('tags'))
+  const [hideInternal, setHideInternal] = useState(false)
   const [page, setPage] = useState(1)
   const [editing, setEditing] = useState<Tx | null>(null)
   const [adding, setAdding] = useState(false)
@@ -43,8 +44,11 @@ export default function TransactionsPage() {
     else if (categoryId === 'internal') p.internalOnly = 'true'
     else if (categoryId === 'investments') p.investmentsOnly = 'true'
     else if (categoryId) p.categoryId = categoryId
+    // Asking for internal transfers and hiding them at once would only ever return nothing,
+    // so the "internal" filter wins and the toggle sits disabled while it is on.
+    if (hideInternal && categoryId !== 'internal') p.hideInternal = 'true'
     return p
-  }, [debouncedSearch, accountId, categoryId, tagIds, page])
+  }, [debouncedSearch, accountId, categoryId, tagIds, hideInternal, page])
 
   const { data } = useQuery({
     queryKey: ['transactions', params],
@@ -115,6 +119,11 @@ export default function TransactionsPage() {
           selected={tagIds}
           onChange={(ids) => { setTagIds(ids); setPage(1) }}
         />
+        <InternalToggle
+          on={hideInternal}
+          disabled={categoryId === 'internal'}
+          onChange={(v) => { setHideInternal(v); setPage(1) }}
+        />
       </Card>
 
       <Card className="px-2 py-2">
@@ -146,6 +155,26 @@ export default function TransactionsPage() {
         <TxForm meta={meta} tx={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); refresh() }} />
       )}
     </div>
+  )
+}
+
+/** Drops transfers between your own accounts from the list, leaving only real money in and out. */
+function InternalToggle({ on, disabled, onChange }:
+  { on: boolean; disabled: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <button
+      onClick={() => onChange(!on)}
+      disabled={disabled}
+      aria-pressed={on}
+      title={disabled
+        ? 'Not available while the internal-transfers filter is on'
+        : 'Hide transfers between your own accounts'}
+      className={`flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-paper px-3 text-sm font-medium transition-shadow disabled:opacity-40 ${
+        on ? 'text-ink shadow-[inset_0_0_0_1.5px_#131B2E]' : 'text-muted hover:text-ink'}`}
+    >
+      <ArrowLeftRight size={14} />
+      Hide internal
+    </button>
   )
 }
 

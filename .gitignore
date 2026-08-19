@@ -13,6 +13,9 @@ dist/
 *.pem
 *.key
 
+# Local-only secrets (account recovery codes, tokens) — stays on this machine
+.secrets/
+
 # Data-protection key ring (encrypts the session cookie)
 keys/
 backend/Skarb.Api/keys/

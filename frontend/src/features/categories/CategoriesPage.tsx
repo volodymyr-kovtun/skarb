@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus } from 'lucide-react'
+import { Plus, Search, X } from 'lucide-react'
 import { api, refreshAll, type CategoryKind, type CategoryWithCount, type Tag } from '../../shared/api'
 import { CATEGORY_COLORS, Card, CardHeader, CategoryDot, ColorPicker, Dot, Modal, ModalActions, btnGhost, btnPrimary, errMsg, fieldLabelCls, inputCls, quietLinkCls } from '../../shared/ui'
 import { useIsDark } from '../../shared/theme'
@@ -184,6 +184,9 @@ function TagForm({ tag, onClose, onSaved }: { tag?: Tag; onClose: () => void; on
   )
 }
 
+/** Rules shown before "Show more" — the seeded set alone runs to a few hundred. */
+const RULES_PAGE = 12
+
 // Top-level component: defining it inside the page would remount it (and drop
 // its input state) on every parent render.
 function RulesCard() {
@@ -193,6 +196,21 @@ function RulesCard() {
   const [pattern, setPattern] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [applyMsg, setApplyMsg] = useState('')
+  const [search, setSearch] = useState('')
+  const [visible, setVisible] = useState(RULES_PAGE)
+
+  const all = rules ?? []
+  const query = search.trim().toLowerCase()
+  const matches = query
+    ? all.filter((r) => r.pattern.toLowerCase().includes(query) || r.category.name.toLowerCase().includes(query))
+    : all
+  const shown = matches.slice(0, visible)
+
+  // A fresh search starts back at the top of the list.
+  const searchFor = (value: string) => {
+    setSearch(value)
+    setVisible(RULES_PAGE)
+  }
 
   const applyNow = async () => {
     const r = await api.applyRules()
@@ -202,8 +220,11 @@ function RulesCard() {
 
   const add = async () => {
     if (!pattern.trim() || !categoryId) return
-    await api.createRule({ pattern: pattern.trim(), categoryId, priority: (rules?.length ?? 0) + 1 })
+    const added = pattern.trim()
+    await api.createRule({ pattern: added, categoryId, priority: (rules?.length ?? 0) + 1 })
     setPattern('')
+    // A new rule sorts to the bottom of a long list — search for it so it is visible.
+    searchFor(added)
     qc.invalidateQueries({ queryKey: ['rules'] })
   }
 
@@ -233,20 +254,56 @@ function RulesCard() {
           </select>
           <button className={btnPrimary} onClick={add} disabled={!pattern.trim() || !categoryId}>Add</button>
         </div>
-        {(rules ?? []).length > 0 && (
-          <ul className="mt-4 flex flex-col">
-            {rules!.map((r) => (
-              <li key={r.id} className="flex items-center gap-3 border-b border-line py-2.5 text-[13.5px] last:border-0">
-                <code className="rounded-md bg-surface2 px-2.5 py-1 text-[12.5px]">{r.pattern}</code>
-                <span className="text-faint">→</span>
-                <span>{r.category.emoji} {r.category.name}</span>
-                <button className="ml-auto text-[12.5px] font-semibold text-faint transition-colors hover:text-danger"
-                  onClick={async () => { await api.deleteRule(r.id); qc.invalidateQueries({ queryKey: ['rules'] }) }}>
-                  remove
+        {all.length > 0 && (
+          <>
+            <label className="mt-5 flex h-11 items-center gap-2.5 rounded-full bg-surface2 px-4 transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_var(--sk-accent)]">
+              <Search size={17} className="shrink-0 text-faint" />
+              <input
+                className="h-full w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-faint"
+                placeholder={`Search ${all.length} rules by keyword or category…`}
+                value={search}
+                onChange={(e) => searchFor(e.target.value)}
+              />
+              {search && (
+                <button onClick={() => searchFor('')} aria-label="Clear search" className="shrink-0 text-faint hover:text-ink">
+                  <X size={15} />
                 </button>
-              </li>
-            ))}
-          </ul>
+              )}
+            </label>
+
+            {matches.length === 0 ? (
+              <p className="py-6 text-center text-sm text-faint">No rule matches “{search.trim()}”.</p>
+            ) : (
+              <ul className="mt-2 flex flex-col">
+                {shown.map((r) => (
+                  <li key={r.id} className="flex items-center gap-3 border-b border-line py-2.5 text-[13.5px] last:border-0">
+                    <code className="rounded-md bg-surface2 px-2.5 py-1 text-[12.5px]">{r.pattern}</code>
+                    <span className="text-faint">→</span>
+                    <span>{r.category.emoji} {r.category.name}</span>
+                    <button className="ml-auto text-[12.5px] font-semibold text-faint transition-colors hover:text-danger"
+                      onClick={async () => { await api.deleteRule(r.id); qc.invalidateQueries({ queryKey: ['rules'] }) }}>
+                      remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {matches.length > 0 && (
+              <div className="mt-4 flex items-center gap-3">
+                {shown.length < matches.length && (
+                  <button className={`${btnGhost} h-9 px-4 py-0 text-[13px]`} onClick={() => setVisible((v) => v + RULES_PAGE)}>
+                    Show more
+                  </button>
+                )}
+                <p className="text-[12.5px] text-faint">
+                  Showing {shown.length} of {matches.length}
+                  {query && ` matching rule${matches.length === 1 ? '' : 's'}`}
+                  {!query && ` rule${matches.length === 1 ? '' : 's'}`}
+                </p>
+              </div>
+            )}
+          </>
         )}
       </div>
     </Card>

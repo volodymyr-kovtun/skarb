@@ -44,6 +44,9 @@ All notable changes to Skarb are documented here. The format follows
 - Investment tracking via investment-kind categories (Brokerage, Crypto seeded; IBKR rules).
 - Category management with emoji, color, kind and keyword auto-categorization rules;
   built-in MCC mapping for card transactions.
+- Auto-categorization rules are searchable (by keyword or category) and load a page at a
+  time behind a *Show more* button, so the ~190 seeded rules no longer stretch the
+  Categories page. Adding a rule jumps the search to it, so it is visible straight away.
 - Bank sync: Monobank (personal API + optional instant webhook), Enable Banking (PKO BP
   and 2,500+ European banks), CSV import with ZEN / PKO presets.
 - Bank connections can be renamed from Settings. The accounts synced through a connection

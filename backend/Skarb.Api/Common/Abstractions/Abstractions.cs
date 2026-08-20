@@ -67,6 +67,17 @@ public interface ITransferDetector
     Task<int> DetectAsync(CancellationToken ct);
 }
 
+/// <summary>
+/// Watches account balances against their per-account thresholds and pings the configured
+/// Telegram chat when one drops below — so the person who tops the account up hears about
+/// it without opening the app.
+/// </summary>
+public interface ILowBalanceAlerter
+{
+    /// <summary>Evaluates every account with a threshold; safe to call after any balance change.</summary>
+    Task CheckAsync(CancellationToken ct);
+}
+
 /// <summary>Converts amounts between currencies.</summary>
 public interface IExchangeRateService
 {

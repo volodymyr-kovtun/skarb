@@ -6,10 +6,12 @@ using Skarb.Api.Common.Persistence;
 using Skarb.Api.Common.Security;
 using Skarb.Api.Common.Services;
 using Skarb.Api.Features.Import;
+using Skarb.Api.Features.Notifications;
 using Skarb.Api.Features.Sync;
 using Skarb.Api.Infrastructure.Banking.EnableBanking;
 using Skarb.Api.Infrastructure.Banking.Monobank;
 using Skarb.Api.Infrastructure.Fx;
+using Skarb.Api.Infrastructure.Notifications;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,6 +44,8 @@ builder.Services.AddScoped<IBankProvider>(sp => sp.GetRequiredService<EnableBank
 
 // --- features ---
 builder.Services.AddScoped<CsvImportService>();
+builder.Services.AddSingleton<TelegramApiClient>();
+builder.Services.AddSingleton<ILowBalanceAlerter, LowBalanceAlerter>();
 builder.Services.AddSingleton<ISyncService, SyncService>();
 builder.Services.AddHostedService<BackgroundSyncService>();
 

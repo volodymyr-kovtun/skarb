@@ -50,6 +50,11 @@ Built for a PKO BP + ZEN + Monobank setup, but works with 2,500+ European banks.
     across Europe (or per country), free for personal use
   - **ZEN** — CSV statement import (ZEN has no API; see the guide)
   - background auto-sync every hour + "Sync now" button
+- **Low-balance alerts to Telegram** — give any account a limit and Skarb messages a
+  Telegram chat the moment the balance drops below it (instantly with the Monobank
+  webhook, otherwise at the next sync). Each account can alert its own chat — point the
+  shared card at the person who tops it up. One ping per drop, a daily reminder while it
+  stays low, re-armed when the balance recovers. Setup: [docs/ALERTS.md](docs/ALERTS.md).
 - **CSV import** — presets for ZEN and PKO iPKO, configurable column mapping, duplicate-safe re-imports
 
 ## Quick start
@@ -109,8 +114,8 @@ backend/Skarb.Api/
   Common/
     Domain/           entities (Account, Transaction, Category, …)
     Persistence/      SkarbDbContext + seed
-    Abstractions/     IBankProvider, ITransactionIngestor, ICategorizer,
-                      ITransferDetector, IExchangeRateService, ISyncService, IEndpointGroup
+    Abstractions/     IBankProvider, ITransactionIngestor, ICategorizer, ITransferDetector,
+                      IExchangeRateService, ISyncService, ILowBalanceAlerter, IEndpointGroup
     Services/         TransactionIngestor, RuleBasedCategorizer, TransferDetector
     Security/         IPasswordHasher, ITotpAuthenticator, IRecoveryCodeService,
                       IOwnerStore, IOwnerAuthenticator, IOwnerSetup + cookie/authz wiring
@@ -118,9 +123,10 @@ backend/Skarb.Api/
     Banking/Monobank/       MonobankApiClient (HTTP) + MonobankProvider (IBankProvider)
     Banking/EnableBanking/  EnableBankingApiClient (HTTP+JWT) + EnableBankingProvider
     Fx/                     OpenErApiExchangeRateService
+    Notifications/          TelegramApiClient (HTTP)
   Features/           one folder per slice, endpoints implement IEndpointGroup
     Auth/ Accounts/ Transactions/ Categories/ Tags/ Dashboard/
-    Connections/ Sync/ Import/ Webhooks/ Meta/
+    Connections/ Sync/ Import/ Webhooks/ Notifications/ Meta/
   Migrations/         EF Core migrations
 frontend/src/
   shared/             typed api client, UI primitives, Layout

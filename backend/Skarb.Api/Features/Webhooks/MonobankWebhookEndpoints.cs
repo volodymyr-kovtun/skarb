@@ -27,7 +27,7 @@ public class MonobankWebhookEndpoints : IEndpointGroup
         app.MapPost("/api/webhooks/monobank/{connectionId:guid}",
             async (Guid connectionId, HttpRequest request, SkarbDbContext db,
                    ITransactionIngestor ingestor, IServiceScopeFactory scopeFactory,
-                   ILoggerFactory loggerFactory) =>
+                   ILowBalanceAlerter alerter, ILoggerFactory loggerFactory) =>
         {
             using var doc = await JsonDocument.ParseAsync(request.Body);
             if (!doc.RootElement.TryGetProperty("data", out var data)) return Results.Ok();
@@ -60,6 +60,9 @@ public class MonobankWebhookEndpoints : IEndpointGroup
                 {
                     loggerFactory.CreateLogger("MonobankWebhook").LogError(ex, "Transfer detection after webhook failed");
                 }
+                // The push carried the fresh balance — this is what makes a low-balance
+                // alert land seconds after the payment, not at the next sync round.
+                await alerter.CheckAsync(CancellationToken.None);
             });
 
             return Results.Ok();

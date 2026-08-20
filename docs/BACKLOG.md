@@ -78,8 +78,9 @@ every number on the overview gets a little less true.
 - After a manual categorization, offer the rule: *"always file BIEDRONKA under
   Groceries?"*. The rule engine and `POST /api/rules` already exist; this is the
   missing prompt that would make them accumulate on their own.
-- Optionally a weekly digest once notifications exist at all — Skarb sends
-  nothing today, and that is a feature, so any reminder should be in-app first.
+- Optionally a weekly digest over the Telegram channel that low-balance alerts
+  already use ([docs/ALERTS.md](ALERTS.md)) — though a nudge about bookkeeping is
+  easier to ignore than one about money running out, so in-app first still holds.
 
 **Open questions.**
 

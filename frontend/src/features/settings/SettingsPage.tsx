@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import { Landmark, Plug, Upload, Trash2, RefreshCw, Webhook, CheckCircle2, AlertCircle, History, Pencil } from 'lucide-react'
-import { accountLabel, api, refreshAll, type Connection, type Meta } from '../../shared/api'
+import { accountLabel, api, refreshAll, type Connection, type Meta, type TelegramChat } from '../../shared/api'
 import { Card, CardHeader, Modal, btnGhost, btnPrimary, errMsg, fieldLabelCls, inputCls } from '../../shared/ui'
 import { SecuritySettings } from '../auth/SecuritySettings'
 
@@ -39,7 +39,7 @@ export default function SettingsPage() {
     <div className="flex flex-col gap-5">
       <div>
         <h1 className="font-display text-[30px] font-semibold tracking-[-0.02em]">Settings</h1>
-        <p className="mt-2 text-[14.5px] text-muted">Bank connections, imports and automation.</p>
+        <p className="mt-2 text-[14.5px] text-muted">Bank connections, imports, alerts and automation.</p>
       </div>
 
       {banner && (
@@ -101,12 +101,152 @@ export default function SettingsPage() {
         </div>
       </Card>
 
+      <NotificationsCard />
+
       <SecuritySettings />
 
       {monoOpen && <MonobankModal onClose={() => setMonoOpen(false)} onDone={() => { setMonoOpen(false); refresh() }} />}
       {ebOpen && <EnableBankingModal onClose={() => setEbOpen(false)} />}
       {csvOpen && meta && <CsvModal meta={meta} onClose={() => setCsvOpen(false)} onDone={(msg) => { setCsvOpen(false); setBanner({ ok: true, text: msg }); refresh() }} />}
     </div>
+  )
+}
+
+/**
+ * Telegram low-balance alerts: one bot per instance, a default chat, and per-account
+ * limits (set in the account editor) that can each name their own chat.
+ */
+function NotificationsCard() {
+  const qc = useQueryClient()
+  const { data: tg } = useQuery({ queryKey: ['telegram'], queryFn: api.telegramSettings })
+  const [token, setToken] = useState('')
+  // null = untouched, so a background refetch doesn't clobber what the user is typing.
+  const [chatId, setChatId] = useState<string | null>(null)
+  const [chats, setChats] = useState<TelegramChat[] | null>(null)
+  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const shownChat = chatId ?? tg?.chatId ?? ''
+  const dirty = token.trim() !== '' || (chatId !== null && chatId !== (tg?.chatId ?? ''))
+
+  const run = (fn: () => Promise<void>) => async () => {
+    setBusy(true)
+    setNote(null)
+    try {
+      await fn()
+    } catch (e) {
+      setNote({ ok: false, text: errMsg(e) })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const save = run(async () => {
+    const saved = await api.saveTelegramSettings({ botToken: token.trim() || null, chatId: shownChat })
+    setToken('')
+    setChatId(null)
+    qc.invalidateQueries({ queryKey: ['telegram'] })
+    setNote({ ok: true, text: saved.hasToken ? `Saved — bot @${saved.botUsername} is connected.` : 'Saved.' })
+  })
+
+  const disconnect = run(async () => {
+    await api.saveTelegramSettings({ botToken: '' })
+    setToken('')
+    qc.invalidateQueries({ queryKey: ['telegram'] })
+    setNote({ ok: true, text: 'Bot disconnected — no more alerts until a new token is saved.' })
+  })
+
+  const test = run(async () => {
+    const r = await api.telegramTest(shownChat || undefined)
+    setNote({ ok: true, text: `Test message sent to chat ${r.sentTo} — check Telegram.` })
+  })
+
+  // Saves a freshly pasted token on the way, so "paste token → Find chats" just works.
+  const findChats = run(async () => {
+    if (token.trim()) {
+      await api.saveTelegramSettings({ botToken: token.trim() })
+      setToken('')
+      qc.invalidateQueries({ queryKey: ['telegram'] })
+    }
+    const list = await api.telegramChats()
+    setChats(list)
+    if (list.length === 0)
+      setNote({
+        ok: false,
+        text: 'No chats found. The recipient has to open the bot in Telegram and press Start, ' +
+          'then look again — chats only show up here for about a day after their last message.',
+      })
+  })
+
+  return (
+    <Card className="pb-7">
+      <CardHeader title="Notifications" />
+      <div className="flex flex-col gap-3 px-7 pt-1">
+        <p className="text-sm text-muted">
+          Skarb can ping a Telegram chat the moment an account drops below its limit — handy when
+          someone else tops the card up. Create a bot with{' '}
+          <a className="font-medium text-ink underline" href="https://t.me/BotFather" target="_blank" rel="noreferrer">@BotFather</a>{' '}
+          (send it <code className="rounded bg-surface2 px-1">/newbot</code>), paste the token here,
+          and have the recipient open the bot and press <span className="font-medium text-ink">Start</span>.
+          Then set a limit on any account on the Accounts page.
+        </p>
+
+        {tg?.hasToken && (
+          <p className="flex items-center gap-2 text-sm font-medium text-income">
+            <CheckCircle2 size={16} />
+            Bot {tg.botUsername ? `@${tg.botUsername}` : ''} is connected.
+          </p>
+        )}
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="text-sm">
+            <span className={fieldLabelCls}>Bot token</span>
+            <input className={inputCls} type="password" value={token}
+              placeholder={tg?.hasToken ? 'saved — paste a new one to replace' : '1234567890:ABC-…'}
+              onChange={(e) => setToken(e.target.value)} />
+          </label>
+          <label className="text-sm">
+            <span className={fieldLabelCls}>Default chat</span>
+            <div className="flex gap-2">
+              <input className={inputCls} value={shownChat} placeholder="chat ID, e.g. 123456789"
+                onChange={(e) => setChatId(e.target.value)} />
+              <button className={btnGhost + ' shrink-0'} onClick={findChats}
+                disabled={busy || (!tg?.hasToken && !token.trim())}
+                title="List chats that recently messaged the bot">
+                Find chats
+              </button>
+            </div>
+          </label>
+        </div>
+
+        {chats && chats.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-faint">Talked to the bot recently:</span>
+            {chats.map((c) => (
+              <button key={c.id}
+                className="rounded-full bg-surface2 px-3 py-1.5 text-[13px] font-medium transition-colors hover:bg-hover"
+                onClick={() => { setChatId(c.id); setChats(null) }}>
+                {c.name} <span className="text-faint">· {c.id}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {note && (
+          <p className={`text-sm font-medium ${note.ok ? 'text-income' : 'text-danger'}`}>{note.text}</p>
+        )}
+
+        <div className="mt-1 flex flex-wrap gap-2.5">
+          <button className={btnPrimary} onClick={save} disabled={busy || !dirty}>Save</button>
+          <button className={btnGhost} onClick={test} disabled={busy || !tg?.hasToken || !shownChat}>
+            Send test message
+          </button>
+          {tg?.hasToken && (
+            <button className={btnGhost} onClick={disconnect} disabled={busy}>Disconnect bot</button>
+          )}
+        </div>
+      </div>
+    </Card>
   )
 }
 

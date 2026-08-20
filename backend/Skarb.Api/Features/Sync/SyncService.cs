@@ -12,7 +12,7 @@ namespace Skarb.Api.Features.Sync;
 /// so new integrations require zero changes here. Syncs run in the background
 /// (Monobank rate limits make them take minutes); the UI polls status.
 /// </summary>
-public class SyncService(IServiceScopeFactory scopeFactory, ILogger<SyncService> logger) : ISyncService
+public class SyncService(IServiceScopeFactory scopeFactory, ILowBalanceAlerter alerter, ILogger<SyncService> logger) : ISyncService
 {
     private readonly ConcurrentDictionary<Guid, string> _running = new();
 
@@ -37,12 +37,14 @@ public class SyncService(IServiceScopeFactory scopeFactory, ILogger<SyncService>
 
         // Transfer detection needs both legs, so it runs once after the whole round —
         // not per connection, where parallel runs would rescan and race each other.
-        if (tasks.Count > 0)
-            _ = Task.Run(async () =>
-            {
-                await Task.WhenAll(tasks);
-                await DetectTransfersAsync();
-            });
+        // Low balances are re-checked even on an empty round: the daily reminder has to
+        // fire off the periodic trigger alone, without any sync having run.
+        _ = Task.Run(async () =>
+        {
+            await Task.WhenAll(tasks);
+            if (tasks.Count > 0) await DetectTransfersAsync();
+            await alerter.CheckAsync(CancellationToken.None);
+        });
 
         return started;
     }

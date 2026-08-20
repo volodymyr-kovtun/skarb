@@ -114,8 +114,9 @@ public class EnableBankingProvider(
 
     private async Task<int> FetchTransactionsAsync(EnableBankingSettings settings, Account account, DateTime? lastKnown, CancellationToken ct)
     {
-        var dateFrom = (lastKnown?.AddDays(-3) ?? DateTime.UtcNow.AddDays(-Math.Max(options.Value.InitialHistoryDays, 90)))
-            .ToString("yyyy-MM-dd");
+        var from = lastKnown?.AddDays(-3) ?? DateTime.UtcNow.AddDays(-Math.Max(options.Value.InitialHistoryDays, 90));
+        if (options.Value.StartUtc is { } start && from < start) from = start;
+        var dateFrom = from.ToString("yyyy-MM-dd");
 
         var added = 0;
         string? continuationKey = null;

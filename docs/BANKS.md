@@ -163,6 +163,11 @@ no code changes needed.
 
 - A background service syncs every linked connection every **hour**
   (`Sync:IntervalMinutes` in `appsettings.json`; `0` disables it).
+- **`Sync:StartDate` is where the ledger opens.** Set to a date (`"2026-08-01"`), nothing
+  older ever enters Skarb: connectors stop asking their banks for it, and anything a bank
+  volunteers anyway is dropped on the way in — including on a full re-sync. Deleting the
+  older transactions once therefore makes them stay deleted. Leave it out for no cutoff.
+  The boundary is midnight **UTC**, like every other date boundary in Skarb.
 - **Sync now** in the sidebar (or per connection in Settings) triggers the same thing
   on demand; progress and results appear under **Settings → Sync activity**.
 - New transactions are auto-categorized: your keyword rules first

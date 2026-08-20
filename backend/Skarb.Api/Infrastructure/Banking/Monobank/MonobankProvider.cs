@@ -46,6 +46,9 @@ public class MonobankProvider(
             var from = !full && watermarks.TryGetValue(account.Id, out var last)
                 ? last.AddHours(-2)
                 : DateTime.UtcNow.AddDays(-options.Value.InitialHistoryDays);
+            // Never ask for statements older than the ledger start — at one request per
+            // 60 seconds, every skipped window is a minute of sync the user doesn't wait.
+            if (options.Value.StartUtc is { } start && from < start) from = start;
             newTx += await FetchStatementsAsync(settings.Token, account, from, ct);
         }
 

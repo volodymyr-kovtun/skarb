@@ -92,6 +92,11 @@ All notable changes to Skarb are documented here. The format follows
   instead of leaving orphaned accounts behind. Manually created accounts are untouched, and
   the confirmation says exactly how much is going.
 - Background auto-sync every hour and on-demand "Sync now".
+- **A start date for the ledger** (`Sync:StartDate`), for opening the books on a chosen day
+  rather than on whatever window a bank happens to offer. Connectors stop asking for anything
+  older, and anything a bank volunteers regardless is dropped on the way in — from every
+  source, full re-sync included — so deleting the earlier history once makes it stay deleted.
+  The boundary is midnight UTC, like every other date boundary in Skarb.
 - PostgreSQL storage via Docker Compose, EF Core migrations, `make`-driven workflow.
 - Building the API builds the SPA into `wwwroot` when the frontend changed, so running from
   an IDE or a bare `dotnet run` never serves a stale bundle (`-p:SkipSpa=true` opts out).

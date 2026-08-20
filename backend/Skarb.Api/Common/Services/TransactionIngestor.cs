@@ -1,14 +1,21 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Skarb.Api.Common.Abstractions;
 using Skarb.Api.Common.Domain;
 using Skarb.Api.Common.Persistence;
 
 namespace Skarb.Api.Common.Services;
 
-public class TransactionIngestor(SkarbDbContext db, ICategorizer categorizer) : ITransactionIngestor
+public class TransactionIngestor(SkarbDbContext db, ICategorizer categorizer, IOptions<SyncOptions> options)
+    : ITransactionIngestor
 {
     public async Task<int> IngestAsync(Account account, IReadOnlyCollection<IncomingTransaction> items, CancellationToken ct)
     {
+        // The ledger's start date is enforced here rather than in each provider: banks answer
+        // with whole statement pages, so however narrow the request window was, this is the
+        // gate that actually keeps pre-start history out — of every source, sync included.
+        if (options.Value.StartUtc is { } start)
+            items = items.Where(i => i.OccurredAtUtc >= start).ToList();
         if (items.Count == 0) return 0;
 
         var ids = items.Select(i => i.ExternalId).ToList();

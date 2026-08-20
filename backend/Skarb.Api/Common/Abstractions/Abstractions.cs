@@ -97,6 +97,17 @@ public sealed class SyncOptions
     public const string Section = "Sync";
     public int IntervalMinutes { get; set; } = 30;
     public int InitialHistoryDays { get; set; } = 31;
+    /// <summary>
+    /// The day the ledger opens, as a clean starting point for accounting. Nothing dated
+    /// earlier enters the ledger: providers stop asking for it, and the ingestor drops it
+    /// if a bank hands it over anyway. Null means no start date — the full history window.
+    /// </summary>
+    public DateOnly? StartDate { get; set; }
+    /// <summary>
+    /// Midnight UTC on <see cref="StartDate"/>, the cutoff <see cref="Domain.Transaction.OccurredAt"/>
+    /// is compared against. UTC because every other date boundary in Skarb is UTC too.
+    /// </summary>
+    public DateTime? StartUtc => StartDate?.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
     /// <summary>How far back the transfer detector looks for matching legs.</summary>
     public int TransferLookbackDays { get; set; } = 14;
     /// <summary>Maximum time between the two legs of a detected internal transfer.</summary>

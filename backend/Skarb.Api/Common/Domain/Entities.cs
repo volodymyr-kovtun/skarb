@@ -95,8 +95,40 @@ public class Account
     /// consider yours to spend.
     /// </summary>
     public bool IsExcluded { get; set; }
+    /// <summary>
+    /// Send a low-balance alert when <see cref="Balance"/> falls below this amount
+    /// (in the account currency). Null = no alert for this account.
+    /// </summary>
+    public decimal? LowBalanceThreshold { get; set; }
+    /// <summary>
+    /// Telegram chat this account's alerts go to — e.g. the person who tops the account up.
+    /// Null = the default chat in <see cref="NotificationSettings"/>.
+    /// </summary>
+    public string? LowBalanceChatId { get; set; }
+    /// <summary>
+    /// When the current low period was last announced. Null while the balance sits at or
+    /// above the threshold; set on send, so a low balance is announced once per crossing
+    /// (with a daily reminder) instead of on every sync.
+    /// </summary>
+    public DateTime? LowBalanceNotifiedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public List<Transaction> Transactions { get; set; } = [];
+}
+
+/// <summary>
+/// Where alerts are delivered. A single row, like <see cref="OwnerAccount"/> — Skarb is
+/// single-tenant and runs one Telegram bot per instance.
+/// </summary>
+public class NotificationSettings
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    /// <summary>Bot token from @BotFather. Empty = Telegram delivery is off.</summary>
+    public string TelegramBotToken { get; set; } = "";
+    /// <summary>The bot's @username, captured when the token is saved, so the UI can say who to message.</summary>
+    public string? TelegramBotUsername { get; set; }
+    /// <summary>Chat alerts go to unless an account names its own — see <see cref="Account.LowBalanceChatId"/>.</summary>
+    public string TelegramChatId { get; set; } = "";
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 
 public class Transaction

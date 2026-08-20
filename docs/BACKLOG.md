@@ -78,8 +78,9 @@ every number on the overview gets a little less true.
 - A review queue that opens the oldest uncategorized transaction, takes one
   keystroke per category, and moves to the next. Grouping by merchant first, so
   eleven Żabka rows are one decision rather than eleven.
-- Optionally a weekly digest once notifications exist at all — Skarb sends
-  nothing today, and that is a feature, so any reminder should be in-app first.
+- Optionally a weekly digest over the Telegram channel that low-balance alerts
+  already use ([docs/ALERTS.md](ALERTS.md)) — though a nudge about bookkeeping is
+  easier to ignore than one about money running out, so in-app first still holds.
 
 **Open questions.**
 

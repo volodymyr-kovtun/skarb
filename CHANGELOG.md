@@ -97,6 +97,15 @@ All notable changes to Skarb are documented here. The format follows
   asking for anything older, and anything a bank volunteers regardless is dropped on the way
   in — from every source, full re-sync included — so deleting the earlier history once makes
   it stay deleted. The boundary is midnight UTC, like every other date boundary in Skarb.
+- **Low-balance alerts to Telegram.** Any account can carry a limit (in its own currency);
+  when the balance crosses below it, a Telegram message goes out — seconds after the
+  payment when the Monobank webhook is on, otherwise at the next sync round. One message
+  per drop with a daily reminder while it stays low, re-armed once the balance recovers,
+  so a balance hovering at the limit cannot spam anyone. Each account can alert its own
+  chat (the shared card pings whoever tops it up); everything else uses the default chat
+  from Settings → Notifications, where the bot is connected, chats that messaged it can be
+  picked by name, and a test message proves the wiring. Sent and failed alerts appear in
+  Sync activity. Setup walkthrough: [docs/ALERTS.md](docs/ALERTS.md).
 - PostgreSQL storage via Docker Compose, EF Core migrations, `make`-driven workflow.
 - Building the API builds the SPA into `wwwroot` when the frontend changed, so running from
   an IDE or a bare `dotnet run` never serves a stale bundle (`-p:SkipSpa=true` opts out).

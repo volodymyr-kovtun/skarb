@@ -7,6 +7,10 @@ export type Account = {
   id: string; name: string; bank: string; provider: string; currency: string
   balance: number; iban: string | null; maskedPan: string | null; color: string
   isArchived: boolean; isExcluded: boolean; connectionId: string | null
+  /** Alert when the balance drops below this (account currency); null = alerts off. */
+  lowBalanceThreshold: number | null
+  /** Telegram chat this account alerts; null = the default chat from Settings. */
+  lowBalanceChatId: string | null
 }
 
 export type Tx = {
@@ -73,6 +77,9 @@ export type SyncStatus = {
   running: string[]
   logs: { at: string; provider: string; message: string; success: boolean; newTransactions: number }[]
 }
+
+export type TelegramSettings = { hasToken: boolean; botUsername: string | null; chatId: string }
+export type TelegramChat = { id: string; name: string }
 
 export type Session = { authenticated: boolean; email: string | null; setupRequired: boolean }
 export type SetupChallenge = { secret: string; provisioningUri: string }
@@ -151,8 +158,11 @@ export const api = {
 
   createAccount: (body: { name: string; bank: string; currency: string; balance: number; color?: string }) =>
     post<Account>('/api/accounts', body),
-  updateAccount: (id: string, body: { name?: string; color?: string; isArchived?: boolean; isExcluded?: boolean }) =>
-    patch<Account>(`/api/accounts/${id}`, body),
+  updateAccount: (id: string, body: {
+    name?: string; color?: string; isArchived?: boolean; isExcluded?: boolean
+    /** Set true to apply the two lowBalance fields; null threshold turns the alert off. */
+    lowBalanceSet?: boolean; lowBalanceThreshold?: number | null; lowBalanceChatId?: string | null
+  }) => patch<Account>(`/api/accounts/${id}`, body),
   deleteAccount: (id: string) => del(`/api/accounts/${id}`),
 
   categories: () => get<CategoryWithCount[]>('/api/categories'),
@@ -195,6 +205,13 @@ export const api = {
     post<{ url: string }>(`/api/connections/${id}/enablebanking/authorize`, body),
   ebComplete: (id: string, code: string) =>
     post<{ status: string }>(`/api/connections/${id}/enablebanking/complete`, { code }),
+
+  telegramSettings: () => get<TelegramSettings>('/api/notifications/telegram'),
+  saveTelegramSettings: (body: { botToken?: string | null; chatId?: string | null }) =>
+    patch<TelegramSettings>('/api/notifications/telegram', body),
+  telegramTest: (chatId?: string) =>
+    post<{ sentTo: string }>('/api/notifications/telegram/test', { chatId: chatId ?? null }),
+  telegramChats: () => get<TelegramChat[]>('/api/notifications/telegram/chats'),
 
   syncAll: () => post<{ started: string[] }>('/api/sync'),
   syncOne: (id: string, full = false) => post<{ started: string[] }>(`/api/sync/${id}${full ? '?full=true' : ''}`),

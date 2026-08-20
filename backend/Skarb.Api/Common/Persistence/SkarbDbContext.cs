@@ -13,6 +13,7 @@ public class SkarbDbContext(DbContextOptions<SkarbDbContext> options) : DbContex
     public DbSet<CategoryRule> CategoryRules => Set<CategoryRule>();
     public DbSet<SyncLog> SyncLogs => Set<SyncLog>();
     public DbSet<OwnerAccount> Owners => Set<OwnerAccount>();
+    public DbSet<NotificationSettings> NotificationSettings => Set<NotificationSettings>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -41,6 +42,7 @@ public class SkarbDbContext(DbContextOptions<SkarbDbContext> options) : DbContex
             .OnDelete(DeleteBehavior.SetNull);
         b.Entity<Account>().Property(a => a.Balance).HasPrecision(18, 2);
         b.Entity<Account>().Property(a => a.CreditLimit).HasPrecision(18, 2);
+        b.Entity<Account>().Property(a => a.LowBalanceThreshold).HasPrecision(18, 2);
 
         b.Entity<Category>().HasIndex(c => c.Name).IsUnique();
         b.Entity<CategoryRule>()

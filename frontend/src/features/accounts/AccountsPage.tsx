@@ -99,6 +99,7 @@ export default function AccountsPage() {
                           {a.currency}
                           {a.maskedPan ? ` · ${a.maskedPan.slice(-8)}` : a.iban ? ` · …${a.iban.slice(-6)}` : ''}
                           {providers.length > 1 && ` · ${providerLabel[a.provider] ?? a.provider}`}
+                          {a.lowBalanceThreshold != null && ` · alert < ${fmtMoney(a.lowBalanceThreshold, a.currency, { decimals: 0 })}`}
                         </span>
                       </span>
                       <span className="tnum text-[14.5px] font-semibold">{fmtMoney(a.balance, a.currency)}</span>
@@ -143,15 +144,25 @@ function AccountForm({ account, onClose, onSaved }:
   const [color, setColor] = useState(account?.color ?? ACCOUNT_COLORS[0])
   const [archived, setArchived] = useState(account?.isArchived ?? false)
   const [excluded, setExcluded] = useState(account?.isExcluded ?? false)
+  const [threshold, setThreshold] = useState(account?.lowBalanceThreshold?.toString() ?? '')
+  const [alertChat, setAlertChat] = useState(account?.lowBalanceChatId ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  // Only to warn when alerts are configured but have nowhere to go.
+  const { data: telegram } = useQuery({ queryKey: ['telegram'], queryFn: api.telegramSettings, enabled: isEdit })
 
   const save = async () => {
     setBusy(true)
     setError('')
     try {
       if (isEdit) {
-        await api.updateAccount(account!.id, { name, color, isArchived: archived, isExcluded: excluded })
+        const limit = parseFloat(threshold)
+        await api.updateAccount(account!.id, {
+          name, color, isArchived: archived, isExcluded: excluded,
+          lowBalanceSet: true,
+          lowBalanceThreshold: Number.isNaN(limit) ? null : limit,
+          lowBalanceChatId: alertChat.trim() || null,
+        })
       } else {
         if (!name.trim()) { setError('Give the account a name.'); return }
         await api.createAccount({ name: name.trim(), bank: bank.trim(), currency, balance: parseFloat(balance || '0'), color })
@@ -207,6 +218,34 @@ function AccountForm({ account, onClose, onSaved }:
         {isEdit && (
           <div className="flex flex-col gap-3 border-t border-line pt-3">
             <div>
+              <span className={fieldLabelCls}>Low balance alert</span>
+              <div className="flex items-center gap-2">
+                <input className={inputCls + ' tnum'} type="number" step="0.01" placeholder="off"
+                  value={threshold} onChange={(e) => setThreshold(e.target.value)} />
+                <span className="shrink-0 text-sm text-muted">{account!.currency}</span>
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-faint">
+                A Telegram message goes out the moment the balance drops below this, with a daily
+                reminder while it stays low. Leave empty for no alert.
+              </p>
+              {threshold.trim() !== '' && (
+                <>
+                  <input className={inputCls + ' mt-2'} placeholder="Telegram chat ID (default from Settings)"
+                    value={alertChat} onChange={(e) => setAlertChat(e.target.value)} />
+                  <p className="mt-1 text-xs leading-relaxed text-faint">
+                    Who to ping for this account — e.g. the person who tops it up. Empty uses the
+                    default chat from Settings → Notifications.
+                  </p>
+                  {telegram && !telegram.hasToken && (
+                    <p className="mt-1.5 text-xs font-medium text-danger">
+                      No Telegram bot is connected yet — connect one in Settings → Notifications
+                      or this alert has nowhere to go.
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+            <div className="border-t border-line pt-3">
               <label className="flex items-center gap-2 text-sm font-medium">
                 <input type="checkbox" checked={excluded} onChange={(e) => setExcluded(e.target.checked)} className="h-4 w-4 accent-[var(--sk-accent)]" />
                 Don't count this account

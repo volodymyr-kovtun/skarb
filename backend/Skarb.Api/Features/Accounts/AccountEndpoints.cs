@@ -6,7 +6,10 @@ using Skarb.Api.Common.Persistence;
 namespace Skarb.Api.Features.Accounts;
 
 public record CreateAccountRequest(string Name, string Bank, string Currency, decimal Balance, string? Color);
-public record UpdateAccountRequest(string? Name, string? Color, bool? IsArchived, bool? IsExcluded);
+/// <param name="LowBalanceSet">Distinguishes "leave the alert alone" from "turn it off" (null threshold), like CategorySet on transactions.</param>
+public record UpdateAccountRequest(
+    string? Name, string? Color, bool? IsArchived, bool? IsExcluded,
+    bool LowBalanceSet = false, decimal? LowBalanceThreshold = null, string? LowBalanceChatId = null);
 
 public class AccountEndpoints : IEndpointGroup
 {
@@ -43,7 +46,7 @@ public class AccountEndpoints : IEndpointGroup
             return Results.Created($"/api/accounts/{account.Id}", account.ToDto());
         });
 
-        group.MapPatch("/{id:guid}", async (Guid id, UpdateAccountRequest req, SkarbDbContext db) =>
+        group.MapPatch("/{id:guid}", async (Guid id, UpdateAccountRequest req, SkarbDbContext db, ILowBalanceAlerter alerter) =>
         {
             var account = await db.Accounts.FindAsync(id);
             if (account is null) return Results.NotFound();
@@ -51,7 +54,19 @@ public class AccountEndpoints : IEndpointGroup
             if (req.Color is not null) account.Color = req.Color;
             if (req.IsArchived is bool archived) account.IsArchived = archived;
             if (req.IsExcluded is bool excluded) account.IsExcluded = excluded;
+            var chatId = string.IsNullOrWhiteSpace(req.LowBalanceChatId) ? null : req.LowBalanceChatId.Trim();
+            var alertChanged = req.LowBalanceSet &&
+                (account.LowBalanceThreshold != req.LowBalanceThreshold || account.LowBalanceChatId != chatId);
+            if (alertChanged)
+            {
+                account.LowBalanceThreshold = req.LowBalanceThreshold;
+                account.LowBalanceChatId = chatId;
+                // A changed limit is judged fresh — and if the balance already sits below it,
+                // the alert goes out right away rather than at the next sync round.
+                account.LowBalanceNotifiedAt = null;
+            }
             await db.SaveChangesAsync();
+            if (alertChanged) _ = Task.Run(() => alerter.CheckAsync(CancellationToken.None));
             return Results.Ok(account.ToDto());
         });
 

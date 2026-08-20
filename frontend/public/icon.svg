@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>Skarb</title>
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#faf8f4"/><stop offset="1" stop-color="#ebe6db"/>
+    </linearGradient>
+    <linearGradient id="dim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".13"/>
+      <stop offset=".45" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#211d18" stop-opacity=".09"/>
+    </linearGradient>
+    <filter id="lift" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#211d18" flood-opacity=".16"/>
+    </filter>
+    <mask id="ring">
+      <rect width="512" height="512" fill="#000"/>
+      <g fill="#fff">
+  <path d="M 269.8 80.5 A 176 176 0 0 1 362.9 395.8 L 319.1 338.5 A 103.83999999999999 103.83999999999999 0 0 0 264.1 152.5 Z" fill="#fff"/>
+  <path d="M 339.7 410.8 A 176 176 0 0 1 93.9 324.4 L 160.3 296.4 A 103.83999999999999 103.83999999999999 0 0 0 305.4 347.3 Z" fill="#fff"/>
+  <path d="M 85.1 298.2 A 176 176 0 0 1 135.5 127.7 L 184.9 180.3 A 103.83999999999999 103.83999999999999 0 0 0 155.2 280.9 Z" fill="#fff"/>
+  <path d="M 157.0 110.5 A 176 176 0 0 1 242.2 80.5 L 247.9 152.5 A 103.83999999999999 103.83999999999999 0 0 0 197.6 170.1 Z" fill="#fff"/>
+      </g>
+    </mask>
+  </defs>
+  <rect width="512" height="512" fill="url(#paper)"/>
+  <g filter="url(#lift)">
+  <path d="M 269.8 80.5 A 176 176 0 0 1 362.9 395.8 L 319.1 338.5 A 103.83999999999999 103.83999999999999 0 0 0 264.1 152.5 Z" fill="#af5229"/>
+  <path d="M 339.7 410.8 A 176 176 0 0 1 93.9 324.4 L 160.3 296.4 A 103.83999999999999 103.83999999999999 0 0 0 305.4 347.3 Z" fill="#775b88"/>
+  <path d="M 85.1 298.2 A 176 176 0 0 1 135.5 127.7 L 184.9 180.3 A 103.83999999999999 103.83999999999999 0 0 0 155.2 280.9 Z" fill="#426f50"/>
+  <path d="M 157.0 110.5 A 176 176 0 0 1 242.2 80.5 L 247.9 152.5 A 103.83999999999999 103.83999999999999 0 0 0 197.6 170.1 Z" fill="#b08a3c"/>
+  </g>
+  <rect width="512" height="512" fill="url(#dim)" mask="url(#ring)"/>
+</svg>

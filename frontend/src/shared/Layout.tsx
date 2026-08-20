@@ -2,7 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { LogOut, RefreshCw } from 'lucide-react'
 import { api } from './api'
-import { IconButton, ThemeToggle } from './ui'
+import { IconButton, Mark, ThemeToggle } from './ui'
 
 const nav = [
   { to: '/', label: 'Overview' },
@@ -38,9 +38,7 @@ export default function Layout() {
       <div className="mx-auto max-w-[1288px]">
         <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent font-display text-[15px] font-bold text-paper">
-              S
-            </span>
+            <Mark size="sm" />
             <span className="font-display text-xl font-semibold tracking-tight">Skarb</span>
           </div>
 

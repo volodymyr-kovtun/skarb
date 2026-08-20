@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Mark } from '../../shared/ui'
 
 /**
  * The chrome every signed-out screen shares: the Skarb mark, a title, one card.
@@ -27,16 +28,6 @@ export function AuthShell({ title, subtitle, children, footer, wide = false }: {
         {footer && <div className="mt-5 text-center text-xs leading-relaxed text-faint">{footer}</div>}
       </div>
     </div>
-  )
-}
-
-export function Mark({ size = 'lg' }: { size?: 'sm' | 'lg' }) {
-  const box = size === 'lg' ? 'h-12 w-12' : 'h-8 w-8'
-  const text = size === 'lg' ? 'text-xl' : 'text-[15px]'
-  return (
-    <span className={`flex ${box} items-center justify-center rounded-full bg-accent`} aria-hidden>
-      <span className={`font-display ${text} font-bold text-paper`}>S</span>
-    </span>
   )
 }
 

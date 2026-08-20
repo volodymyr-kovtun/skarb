@@ -5,6 +5,22 @@ import { setThemeMode, useIsDark, useThemeMode, type ThemeMode } from './theme'
 import { swatch, tint } from './color'
 import { format, isToday, isYesterday, parseISO } from 'date-fns'
 
+/**
+ * The Skarb mark: the spending donut the dashboard draws. It paints from the theme tokens
+ * rather than fixed hexes, so it re-tints with the charts instead of going muddy in dark mode.
+ * The shipped app icons are the same ring with the hues baked in — an SVG file cannot read CSS.
+ */
+export function Mark({ size = 'lg' }: { size?: 'sm' | 'lg' }) {
+  return (
+    <svg viewBox="0 0 512 512" className={size === 'lg' ? 'h-12 w-12' : 'h-8 w-8'} aria-hidden>
+      <path d="M276.9 16.9A240 240 0 0 1 403.4 445.4L344.5 369.6A144.0 144.0 0 0 0 268.6 112.5Z" fill="var(--sk-accent)" />
+      <path d="M368.3 468.1A240 240 0 0 1 35.7 351.3L123.8 313.2A144.0 144.0 0 0 0 323.4 383.3Z" fill="var(--sk-c1)" />
+      <path d="M22.5 311.6A240 240 0 0 1 90.2 82.5L156.5 151.9A144.0 144.0 0 0 0 115.9 289.3Z" fill="var(--sk-c2)" />
+      <path d="M122.8 56.4A240 240 0 0 1 235.1 16.9L243.4 112.5A144.0 144.0 0 0 0 176.1 136.2Z" fill="var(--sk-c8)" />
+    </svg>
+  )
+}
+
 /** The micro-label above a figure — stat tiles, the net-worth hero, day headings. */
 export const labelCls = 'text-[11px] font-semibold uppercase tracking-[0.1em] text-faint'
 /** The heading on a card. Real titles, not small caps. */

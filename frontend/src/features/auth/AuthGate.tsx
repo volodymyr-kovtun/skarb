@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../shared/api'
-import { btnPrimary, errMsg } from '../../shared/ui'
-import { AuthShell, Mark } from './AuthShell'
+import { btnPrimary, errMsg, Mark } from '../../shared/ui'
+import { AuthShell } from './AuthShell'
 import LoginPage from './LoginPage'
 import SetupPage from './SetupPage'
 

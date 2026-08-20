@@ -55,7 +55,7 @@ export default function SetupPage({ onDone }: { onDone: () => void }) {
       {step === 3 && (
         <div className="flex flex-col gap-4">
           <RecoveryCodes codes={codes} />
-          <p className="rounded-xl bg-paper px-3 py-2 text-xs leading-relaxed text-muted">
+          <p className="rounded-row bg-surface2 px-3.5 py-2.5 text-xs leading-relaxed text-muted">
             Store them somewhere other than the device holding your authenticator — a password
             manager or a printout. They are shown only now.
           </p>
@@ -212,7 +212,7 @@ function AuthenticatorStep({ challenge, setupToken, onDone }: {
         <summary className="cursor-pointer font-medium text-faint transition-colors hover:text-muted">
           Can't scan? Enter the key by hand
         </summary>
-        <code className="mt-2 block rounded-lg bg-paper px-3 py-2 font-mono text-[11px] leading-relaxed break-all">
+        <code className="mt-2 block rounded-row bg-surface2 px-3.5 py-2.5 font-mono text-[11px] leading-relaxed break-all">
           {challenge.secret}
         </code>
       </details>

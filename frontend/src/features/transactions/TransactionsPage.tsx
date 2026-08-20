@@ -4,7 +4,15 @@ import { useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { ArrowLeftRight, ChevronDown, Plus, Search, Tag as TagIcon, X } from 'lucide-react'
 import { accountLabel, api, refreshAll, type Meta, type Tag, type Tx } from '../../shared/api'
-import { Card, Modal, ModalActions, TxRow, btnGhost, btnPrimary, dayLabel, errMsg, fieldLabelCls, inputCls } from '../../shared/ui'
+import {
+  Card, Modal, ModalActions, TxRow, btnGhost, btnPrimary, dayLabel, errMsg, fieldLabelCls, inputCls, labelCls, pillCls,
+} from '../../shared/ui'
+import { useIsDark } from '../../shared/theme'
+import { swatch } from '../../shared/color'
+
+/** Account and category filters: a native select wearing the same pill as everything else. */
+const selectPill =
+  'h-11 shrink-0 rounded-full border-r-8 border-transparent bg-surface2 pl-4 text-sm font-semibold text-ink outline-none'
 
 const SPECIAL_FILTERS = {
   uncategorized: '· Uncategorized',
@@ -71,19 +79,19 @@ export default function TransactionsPage() {
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between px-1 pt-2">
-        <h1 className="font-display text-2xl font-bold tracking-tight">Transactions</h1>
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="font-display text-[30px] font-semibold tracking-[-0.02em]">Transactions</h1>
         <button className={btnPrimary} onClick={() => setAdding(true)}>
-          <Plus size={15} className="mr-1 inline -translate-y-px" />
+          <Plus size={16} />
           Add transaction
         </button>
       </div>
 
       {/* Filter bar */}
-      <Card className="flex items-center gap-2 p-2">
-        <label className="flex h-10 min-w-0 flex-1 items-center gap-2.5 rounded-xl bg-paper px-3.5 transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_#131B2E]">
-          <Search size={15} className="shrink-0 text-faint" />
+      <Card className="flex flex-wrap items-center gap-2.5 p-3">
+        <label className="flex h-11 min-w-[15rem] flex-1 items-center gap-2.5 rounded-full bg-surface2 px-4 transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_var(--sk-accent)]">
+          <Search size={17} className="shrink-0 text-faint" />
           <input
             className="h-full w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-faint"
             placeholder="Search description, merchant or note…"
@@ -92,12 +100,12 @@ export default function TransactionsPage() {
           />
           {search && (
             <button onClick={() => setSearch('')} aria-label="Clear search" className="shrink-0 text-faint hover:text-ink">
-              <X size={14} />
+              <X size={15} />
             </button>
           )}
         </label>
         <select
-          className="h-10 w-44 shrink-0 rounded-xl border-r-8 border-transparent bg-paper px-3 text-sm font-medium text-ink outline-none"
+          className={`${selectPill} w-44`}
           value={accountId}
           onChange={(e) => { setAccountId(e.target.value); setPage(1) }}
         >
@@ -105,7 +113,7 @@ export default function TransactionsPage() {
           {meta?.accounts.map((a) => <option key={a.id} value={a.id}>{accountLabel(a)}</option>)}
         </select>
         <select
-          className="h-10 w-48 shrink-0 rounded-xl border-r-8 border-transparent bg-paper px-3 text-sm font-medium text-ink outline-none"
+          className={`${selectPill} w-48`}
           value={categoryId}
           onChange={(e) => { setCategoryId(e.target.value); setPage(1) }}
         >
@@ -126,24 +134,22 @@ export default function TransactionsPage() {
         />
       </Card>
 
-      <Card className="px-2 py-2">
+      <Card className="px-4 py-4">
         {groups.length === 0 && (
-          <p className="px-3 py-10 text-center text-sm text-faint">Nothing here yet. Adjust filters or add a transaction.</p>
+          <p className="px-3 py-12 text-center text-sm text-faint">Nothing here yet. Adjust filters or add a transaction.</p>
         )}
         {groups.map((g) => (
-          <div key={g.day}>
-            <p className="px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-[0.08em] text-faint">
-              {dayLabel(g.items[0].occurredAt)}
-            </p>
+          <div key={g.day} className="mt-2.5 first:mt-0">
+            <p className={`${labelCls} px-3 pb-1.5`}>{dayLabel(g.items[0].occurredAt)}</p>
             {g.items.map((tx) => <TxRow key={tx.id} tx={tx} onClick={() => setEditing(tx)} />)}
           </div>
         ))}
       </Card>
 
       {data && data.total > data.pageSize && (
-        <div className="flex items-center justify-center gap-3 pb-4 text-sm">
+        <div className="flex items-center justify-center gap-4 pb-2 text-sm">
           <button className={btnGhost} disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button>
-          <span className="text-muted">Page {page} of {totalPages}</span>
+          <span className="text-[13.5px] text-muted">Page {page} of {totalPages}</span>
           <button className={btnGhost} disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</button>
         </div>
       )}
@@ -169,10 +175,9 @@ function InternalToggle({ on, disabled, onChange }:
       title={disabled
         ? 'Not available while the internal-transfers filter is on'
         : 'Hide transfers between your own accounts'}
-      className={`flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-paper px-3 text-sm font-medium transition-shadow disabled:opacity-40 ${
-        on ? 'text-ink shadow-[inset_0_0_0_1.5px_#131B2E]' : 'text-muted hover:text-ink'}`}
+      className={`${pillCls} ${on ? 'bg-accent text-paper hover:text-paper' : ''}`}
     >
-      <ArrowLeftRight size={14} />
+      <ArrowLeftRight size={15} />
       Hide internal
     </button>
   )
@@ -182,6 +187,7 @@ function InternalToggle({ on, disabled, onChange }:
 function TagFilter({ tags, selected, onChange }:
   { tags: Tag[]; selected: string[]; onChange: (ids: string[]) => void }) {
   const [open, setOpen] = useState(false)
+  const dark = useIsDark()
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -208,20 +214,19 @@ function TagFilter({ tags, selected, onChange }:
       <button
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        className={`flex h-10 items-center gap-1.5 rounded-xl px-3 text-sm font-medium transition-shadow ${
-          picked.length ? 'bg-paper text-ink shadow-[inset_0_0_0_1.5px_#131B2E]' : 'bg-paper text-muted hover:text-ink'}`}
+        className={`${pillCls} ${picked.length ? 'bg-accent text-paper hover:text-paper' : ''}`}
       >
-        <TagIcon size={14} />
+        <TagIcon size={15} />
         <span className="max-w-32 truncate">{label}</span>
-        <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown size={15} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
-        <div className="absolute right-0 z-30 mt-2 w-64 rounded-xl border border-line bg-surface p-3 shadow-pop">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-medium text-muted">Filter by tag</span>
+        <div className="absolute right-0 z-30 mt-2 w-64 rounded-card bg-surface p-4 shadow-pop">
+          <div className="mb-2.5 flex items-center justify-between">
+            <span className="text-xs font-semibold text-muted">Filter by tag</span>
             {picked.length > 0 && (
-              <button onClick={() => onChange([])} className="text-xs font-medium text-muted hover:text-ink">Clear</button>
+              <button onClick={() => onChange([])} className="text-xs font-semibold text-muted hover:text-ink">Clear</button>
             )}
           </div>
           <div className="flex max-h-64 flex-wrap gap-1.5 overflow-y-auto">
@@ -232,8 +237,10 @@ function TagFilter({ tags, selected, onChange }:
                   key={t.id}
                   onClick={() => onChange(on ? selected.filter((id) => id !== t.id) : [...selected, t.id])}
                   aria-pressed={on}
-                  className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${on ? 'text-white' : 'text-muted hover:text-ink'}`}
-                  style={on ? { background: t.color } : { background: '#F4F5F7' }}
+                  className="rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
+                  style={on
+                    ? { background: swatch(t.color, dark), color: 'var(--sk-paper)' }
+                    : { background: 'var(--sk-surface2)', color: 'var(--sk-muted)' }}
                 >
                   #{t.name}
                 </button>
@@ -249,6 +256,7 @@ function TagFilter({ tags, selected, onChange }:
 function TxForm({ meta, tx, onClose, onSaved }:
   { meta: Meta; tx?: Tx; onClose: () => void; onSaved: () => void }) {
   const qc = useQueryClient()
+  const dark = useIsDark()
   const isEdit = !!tx
   const [kind, setKind] = useState<'expense' | 'income'>(tx ? (tx.amount > 0 ? 'income' : 'expense') : 'expense')
   const [accountId, setAccountId] = useState(tx?.accountId ?? meta.accounts[0]?.id ?? '')
@@ -329,12 +337,12 @@ function TxForm({ meta, tx, onClose, onSaved }:
   return (
     <Modal title={isEdit ? 'Edit transaction' : 'Add transaction'} onClose={onClose}>
       <div className="flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-1 rounded-xl bg-paper p-1">
+        <div className="grid grid-cols-2 gap-1 rounded-full bg-surface2 p-1.5">
           {(['expense', 'income'] as const).map((k) => (
             <button
               key={k}
               onClick={() => { setKind(k); setCategoryId('') }}
-              className={`rounded-lg py-1.5 text-sm font-medium capitalize transition-colors ${kind === k ? 'bg-surface shadow-card' : 'text-muted'}`}
+              className={`rounded-full py-2 text-sm font-semibold transition-colors ${kind === k ? 'bg-surface text-ink shadow-card' : 'text-muted hover:text-ink'}`}
             >
               {k === 'expense' ? 'Money out' : 'Money in'}
             </button>
@@ -377,22 +385,24 @@ function TxForm({ meta, tx, onClose, onSaved }:
 
         <div className="text-sm">
           <span className={fieldLabelCls}>Tags</span>
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-2">
             {meta.tags.map((t) => {
               const on = tagIds.includes(t.id)
               return (
                 <button
                   key={t.id}
                   onClick={() => setTagIds((ids) => on ? ids.filter((x) => x !== t.id) : [...ids, t.id])}
-                  className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${on ? 'text-white' : 'text-muted hover:text-ink'}`}
-                  style={on ? { background: t.color } : { background: '#F4F5F7' }}
+                  className="rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
+                  style={on
+                    ? { background: swatch(t.color, dark), color: 'var(--sk-paper)' }
+                    : { background: 'var(--sk-surface2)', color: 'var(--sk-muted)' }}
                 >
                   #{t.name}
                 </button>
               )
             })}
             <input
-              className="w-24 rounded-full bg-paper px-2.5 py-1 text-xs outline-none placeholder:text-faint"
+              className="w-28 rounded-full bg-surface2 px-3 py-1.5 text-xs outline-none placeholder:text-faint"
               placeholder="+ new tag"
               value={newTag}
               onChange={(e) => setNewTag(e.target.value)}
@@ -409,11 +419,11 @@ function TxForm({ meta, tx, onClose, onSaved }:
         {isEdit && (
           <>
             <label className="flex items-center gap-2 text-sm text-muted">
-              <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} className="h-4 w-4 accent-ink" />
+              <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} className="h-4 w-4 accent-[var(--sk-accent)]" />
               Internal transfer between my own accounts (never counted in stats)
             </label>
             <label className="flex items-center gap-2 text-sm text-muted">
-              <input type="checkbox" checked={excluded} onChange={(e) => setExcluded(e.target.checked)} className="h-4 w-4 accent-ink" />
+              <input type="checkbox" checked={excluded} onChange={(e) => setExcluded(e.target.checked)} className="h-4 w-4 accent-[var(--sk-accent)]" />
               Exclude from stats for another reason (reimbursement, correction)
             </label>
           </>

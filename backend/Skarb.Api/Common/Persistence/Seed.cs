@@ -8,28 +8,28 @@ public static class Seed
     // (SystemKey, Name, Emoji, Color, Kind) — SystemKey is the stable id MCC mapping targets.
     private static readonly (string Key, string Name, string Emoji, string Color, string Kind)[] Defaults =
     [
-        ("groceries", "Groceries", "🛒", "#22C55E", CategoryKinds.Expense),
-        ("restaurants", "Restaurants & Cafes", "🍜", "#F97316", CategoryKinds.Expense),
-        ("transport", "Transport", "🚕", "#3B82F6", CategoryKinds.Expense),
-        ("shopping", "Shopping", "🛍️", "#EC4899", CategoryKinds.Expense),
-        ("housing", "Housing & Utilities", "🏠", "#8B5CF6", CategoryKinds.Expense),
-        ("subscriptions", "Subscriptions", "📺", "#06B6D4", CategoryKinds.Expense),
-        ("health", "Health", "💊", "#EF4444", CategoryKinds.Expense),
-        ("entertainment", "Entertainment", "🎟️", "#EAB308", CategoryKinds.Expense),
-        ("travel", "Travel", "✈️", "#14B8A6", CategoryKinds.Expense),
-        ("education", "Education", "📚", "#6366F1", CategoryKinds.Expense),
-        ("fees", "Fees & Charges", "🏦", "#94A3B8", CategoryKinds.Expense),
-        ("cash", "Cash", "💵", "#71717A", CategoryKinds.Expense),
-        ("taxes", "Taxes & Insurance", "🏛️", "#7C3AED", CategoryKinds.Expense),
-        ("transfers-out", "Transfers to people", "🤝", "#A1A1AA", CategoryKinds.Expense),
-        ("other", "Other", "🧩", "#64748B", CategoryKinds.Expense),
-        ("salary", "Salary", "💼", "#10B981", CategoryKinds.Income),
-        ("freelance", "Freelance", "🧑‍💻", "#84CC16", CategoryKinds.Income),
-        ("interest-cashback", "Interest & Cashback", "💰", "#F59E0B", CategoryKinds.Income),
-        ("transfers-in", "Transfers from people", "🎁", "#34D399", CategoryKinds.Income),
-        ("refunds", "Refunds", "↩️", "#2DD4BF", CategoryKinds.Income),
-        ("brokerage", "Brokerage", "📈", "#B45309", CategoryKinds.Investment),
-        ("crypto", "Crypto", "🪙", "#A16207", CategoryKinds.Investment),
+        ("groceries", "Groceries", "🛒", "#426F50", CategoryKinds.Expense),
+        ("restaurants", "Restaurants & Cafes", "🍜", "#9F4B25", CategoryKinds.Expense),
+        ("transport", "Transport", "🚕", "#546783", CategoryKinds.Expense),
+        ("shopping", "Shopping", "🛍️", "#974D6E", CategoryKinds.Expense),
+        ("housing", "Housing & Utilities", "🏠", "#775B88", CategoryKinds.Expense),
+        ("subscriptions", "Subscriptions", "📺", "#456D67", CategoryKinds.Expense),
+        ("health", "Health", "💊", "#B0322A", CategoryKinds.Expense),
+        ("entertainment", "Entertainment", "🎟️", "#7B6230", CategoryKinds.Expense),
+        ("travel", "Travel", "✈️", "#2F7168", CategoryKinds.Expense),
+        ("education", "Education", "📚", "#5A5F9E", CategoryKinds.Expense),
+        ("fees", "Fees & Charges", "🏦", "#91897C", CategoryKinds.Expense),
+        ("cash", "Cash", "💵", "#6B6559", CategoryKinds.Expense),
+        ("taxes", "Taxes & Insurance", "🏛️", "#6A4B8F", CategoryKinds.Expense),
+        ("transfers-out", "Transfers to people", "🤝", "#8A8375", CategoryKinds.Expense),
+        ("other", "Other", "🧩", "#6E6A5E", CategoryKinds.Expense),
+        ("salary", "Salary", "💼", "#3F7A5C", CategoryKinds.Income),
+        ("freelance", "Freelance", "🧑‍💻", "#6B7A38", CategoryKinds.Income),
+        ("interest-cashback", "Interest & Cashback", "💰", "#A06A24", CategoryKinds.Income),
+        ("transfers-in", "Transfers from people", "🎁", "#47806A", CategoryKinds.Income),
+        ("refunds", "Refunds", "↩️", "#2F7168", CategoryKinds.Income),
+        ("brokerage", "Brokerage", "📈", "#8A4A20", CategoryKinds.Investment),
+        ("crypto", "Crypto", "🪙", "#7A5A2A", CategoryKinds.Investment),
     ];
 
     // (Pattern, SystemKey, Priority) — case-insensitive "contains" match on description, counterparty,
@@ -135,9 +135,9 @@ public static class Seed
         await AddMissingDefaultsAsync(db);
 
         db.Tags.AddRange(
-            new Tag { Name = "vacation", Color = "#14B8A6" },
-            new Tag { Name = "work", Color = "#6366F1" },
-            new Tag { Name = "family", Color = "#F97316" });
+            new Tag { Name = "vacation", Color = "#2F7168" },
+            new Tag { Name = "work", Color = "#5A5F9E" },
+            new Tag { Name = "family", Color = "#9F4B25" });
 
         await db.SaveChangesAsync();
     }

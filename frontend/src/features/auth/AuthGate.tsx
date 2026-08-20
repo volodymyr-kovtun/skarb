@@ -47,7 +47,7 @@ function Unreachable({ message, onRetry }: { message: string; onRetry: () => voi
   return (
     <AuthShell title="Skarb" subtitle="Couldn't reach the server.">
       <div className="flex flex-col gap-4">
-        <p className="rounded-xl bg-danger/5 px-3 py-2 text-sm leading-snug text-danger">{message}</p>
+        <p className="rounded-row bg-danger/10 px-3.5 py-2.5 text-sm font-medium leading-snug text-danger">{message}</p>
         <button className={`${btnPrimary} w-full`} onClick={onRetry}>Try again</button>
       </div>
     </AuthShell>

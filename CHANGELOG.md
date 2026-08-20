@@ -22,9 +22,17 @@ All notable changes to Skarb are documented here. The format follows
   6-month cashflow chart, spending-by-category donut, recent activity.
 - Dashboard currency switcher: every converted figure on the overview can be read in any
   account currency (plus EUR/USD), remembered between visits.
-- Accounts are grouped by institution on the overview (with an allocation bar and each
-  group's share of net worth) and on the Accounts page, so the layout holds up with many
-  accounts instead of growing a row of pills.
+- Dashboard net-worth trend: a six-month line under the headline figure, walked backwards
+  from today's total through each month's net. It follows money in and out, not what
+  holdings did on the market, since Skarb keeps no historical balances.
+- **Light and dark themes.** The theme follows the system by default and can be pinned
+  either way from the header; the choice is remembered and applied before first paint, so
+  a dark-mode instance never flashes white. Colors you pick for a category, tag or account
+  are normalized into a lightness band per theme, so a hue chosen on paper stays legible
+  on a dark surface without being re-picked.
+- Accounts are grouped by institution on the overview (each group showing its share of
+  net worth, expandable to the accounts underneath) and on the Accounts page, so the
+  layout holds up with many accounts instead of growing a row of pills.
 - Transactions: search, filters (account, category, tag, uncategorized, internal transfers,
   investments), manual add / edit / delete, notes, tags. The tag filter takes several tags
   at once and matches transactions carrying any of them.

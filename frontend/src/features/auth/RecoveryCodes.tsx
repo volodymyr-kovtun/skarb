@@ -29,7 +29,7 @@ export function RecoveryCodes({ codes }: { codes: string[] }) {
     <div className="flex flex-col gap-3">
       <ul className="grid grid-cols-2 gap-2">
         {codes.map((code) => (
-          <li key={code} className="rounded-lg bg-paper px-3 py-2 text-center font-mono text-sm tracking-tight">
+          <li key={code} className="rounded-row bg-surface2 px-3 py-2.5 text-center font-mono text-sm tracking-tight">
             {code}
           </li>
         ))}

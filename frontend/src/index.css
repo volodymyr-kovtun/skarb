@@ -1,45 +1,135 @@
 @import "tailwindcss";
 
-@theme {
-  --color-paper: #f4f5f7;
-  --color-surface: #ffffff;
-  --color-line: #e6e8ee;
-  --color-ink: #131b2e;
-  --color-muted: #667085;
-  --color-faint: #98a2b3;
-  --color-gold: #c29b3c;
-  --color-gold-deep: #8a6d22;
-  --color-income: #059669;
-  --color-spend: #4c6ef5;
-  --color-danger: #dc2626;
+/*
+ * Skarb's palette lives in two layers: raw values that swap with the theme, and the
+ * Tailwind tokens that point at them. Only this file knows a hex code.
+ */
+:root {
+  --sk-paper: #f2efe9;
+  --sk-surface: #ffffff;
+  --sk-surface2: #f8f5f0;
+  --sk-line: #e8e2d6;
+  --sk-hover: #f6f3ed;
 
-  --font-display: "Schibsted Grotesk", "Inter", system-ui, sans-serif;
-  --font-sans: "Inter", system-ui, sans-serif;
+  --sk-ink: #211d18;
+  --sk-muted: #5b544a;
+  --sk-faint: #746c5e;
 
-  --shadow-card: 0 1px 2px rgb(19 27 46 / 0.04), 0 4px 16px rgb(19 27 46 / 0.04);
-  --shadow-pop: 0 4px 12px rgb(19 27 46 / 0.08), 0 16px 48px rgb(19 27 46 / 0.16);
+  --sk-accent: #af5229;
+  --sk-income: #437051;
+  --sk-spend: #8a6a9e;
+  --sk-danger: #b0322a;
+
+  /* Chart and category hues. One family, tuned per theme. */
+  --sk-c1: #775b88;
+  --sk-c2: #426f50;
+  --sk-c3: #9f4b25;
+  --sk-c4: #546783;
+  --sk-c5: #974d6e;
+  --sk-c6: #456d67;
+  --sk-c7: #91897c;
+  --sk-c8: #7b6230;
+
+  --sk-shadow-card: 0 1px 2px rgb(33 29 24 / 0.04), 0 14px 34px rgb(33 29 24 / 0.05);
+  --sk-shadow-pop: 0 4px 12px rgb(33 29 24 / 0.10), 0 24px 60px rgb(33 29 24 / 0.18);
+  --sk-scrollbar: #d8d1c4;
+}
+
+[data-theme="dark"] {
+  --sk-paper: #171410;
+  --sk-surface: #221e18;
+  --sk-surface2: #1d1914;
+  --sk-line: #322c23;
+  --sk-hover: #2a251e;
+
+  --sk-ink: #f4eee4;
+  --sk-muted: #a69b8b;
+  --sk-faint: #948b7c;
+
+  --sk-accent: #e08a5b;
+  --sk-income: #7cb794;
+  --sk-spend: #ba9bd2;
+  --sk-danger: #ef9a93;
+
+  --sk-c1: #ba9bd2;
+  --sk-c2: #7cb794;
+  --sk-c3: #e08a5b;
+  --sk-c4: #92aad1;
+  --sk-c5: #d18ba8;
+  --sk-c6: #7fb4ac;
+  --sk-c7: #716c64;
+  --sk-c8: #c9a560;
+
+  --sk-shadow-card: 0 1px 2px rgb(0 0 0 / 0.30), 0 14px 34px rgb(0 0 0 / 0.22);
+  --sk-shadow-pop: 0 4px 12px rgb(0 0 0 / 0.40), 0 24px 60px rgb(0 0 0 / 0.45);
+  --sk-scrollbar: #3d3629;
+}
+
+@theme inline {
+  --color-paper: var(--sk-paper);
+  --color-surface: var(--sk-surface);
+  --color-surface2: var(--sk-surface2);
+  --color-line: var(--sk-line);
+  --color-hover: var(--sk-hover);
+
+  --color-ink: var(--sk-ink);
+  --color-muted: var(--sk-muted);
+  --color-faint: var(--sk-faint);
+
+  --color-accent: var(--sk-accent);
+  --color-income: var(--sk-income);
+  --color-spend: var(--sk-spend);
+  --color-danger: var(--sk-danger);
+
+  --color-c1: var(--sk-c1);
+  --color-c2: var(--sk-c2);
+  --color-c3: var(--sk-c3);
+  --color-c4: var(--sk-c4);
+  --color-c5: var(--sk-c5);
+  --color-c6: var(--sk-c6);
+  --color-c7: var(--sk-c7);
+  --color-c8: var(--sk-c8);
+
+  --font-display: "Bricolage Grotesque", "Manrope", system-ui, sans-serif;
+  --font-sans: "Manrope", system-ui, sans-serif;
+
+  --shadow-card: var(--sk-shadow-card);
+  --shadow-pop: var(--sk-shadow-pop);
+
+  --radius-card: 22px;
+  --radius-row: 14px;
+  --radius-tile: 13px;
 }
 
 html {
   font-family: var(--font-sans);
-  color: var(--color-ink);
-  background: var(--color-paper);
+  color: var(--sk-ink);
+  background: var(--sk-paper);
+  color-scheme: light;
 }
+
+[data-theme="dark"] { color-scheme: dark; }
 
 body {
   margin: 0;
   -webkit-font-smoothing: antialiased;
 }
 
+/* Money should line up wherever it is stacked. */
 .tnum {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
 }
 
-/* Quiet scrollbars to match the calm surface */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #d4d8e0 transparent;
+  scrollbar-color: var(--sk-scrollbar) transparent;
+}
+
+/* Every focusable thing gets the same ring, in whichever theme is on. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--sk-accent);
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {

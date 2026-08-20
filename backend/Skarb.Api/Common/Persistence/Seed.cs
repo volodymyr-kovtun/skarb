@@ -21,6 +21,7 @@ public static class Seed
         ("fees", "Fees & Charges", "🏦", "#91897C", CategoryKinds.Expense),
         ("cash", "Cash", "💵", "#6B6559", CategoryKinds.Expense),
         ("taxes", "Taxes & Insurance", "🏛️", "#6A4B8F", CategoryKinds.Expense),
+        ("donations", "Donations", "❤️", "#B23A5C", CategoryKinds.Expense),
         ("transfers-out", "Transfers to people", "🤝", "#8A8375", CategoryKinds.Expense),
         ("other", "Other", "🧩", "#6E6A5E", CategoryKinds.Expense),
         ("salary", "Salary", "💼", "#3F7A5C", CategoryKinds.Income),
@@ -68,6 +69,14 @@ public static class Seed
         ("github", "subscriptions", 109), ("jetbrains", "subscriptions", 110), ("digitalocean", "subscriptions", 111),
         ("google", "subscriptions", 112), ("google storage", "subscriptions", 113), ("icloud", "subscriptions", 114),
         ("microsoft", "subscriptions", 115), ("adobe", "subscriptions", 116), ("notion", "subscriptions", 117),
+        // donations — named funds and unambiguous words only. MCC 8398 does the heavy lifting
+        // (see RuleBasedCategorizer), because a Monobank jar top-up reads the same whether the
+        // jar is a charity or your own savings, and only the MCC tells them apart.
+        ("донат", "donations", 118), ("donation", "donations", 119), ("donate", "donations", 120),
+        ("charity", "donations", 121), ("sternenko", "donations", 122), ("притула", "donations", 123),
+        ("повернись живим", "donations", 124), ("united24", "donations", 125),
+        ("darowizna", "donations", 126), ("zrzutka", "donations", 127), ("siepomaga", "donations", 128),
+        ("caritas", "donations", 129),
         // transport
         ("uber", "transport", 130), ("bolt", "transport", 131), ("freenow", "transport", 132), ("free now", "transport", 133),
         ("jakdojade", "transport", 134), ("ztm", "transport", 135), ("mpk", "transport", 136), ("koleo", "transport", 137),

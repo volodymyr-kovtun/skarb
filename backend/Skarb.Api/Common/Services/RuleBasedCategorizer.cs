@@ -37,6 +37,7 @@ public class RuleBasedCategorizer(SkarbDbContext db) : ICategorizer
         (4511, 4511, "travel"),
         (7011, 7011, "travel"),
         (8211, 8299, "education"),
+        (8398, 8398, "donations"),
         (6010, 6012, "fees"),
         (6211, 6211, "brokerage"),
         (6300, 6300, "fees"),

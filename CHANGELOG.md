@@ -59,6 +59,10 @@ All notable changes to Skarb are documented here. The format follows
 - Investment tracking via investment-kind categories (Brokerage, Crypto seeded; IBKR rules).
 - Category management with emoji, color, kind and keyword auto-categorization rules;
   built-in MCC mapping for card transactions.
+- A **Donations** category, routed primarily by MCC 8398 rather than by keyword: a Monobank
+  jar top-up reads the same whether the jar belongs to a charity or to your own savings, and
+  only the merchant code tells the two apart. Named funds and unambiguous words
+  (`донат`, `charity`, `zrzutka`, …) are matched as well, for giving that arrives by card.
 - Auto-categorization rules are searchable (by keyword or category) and load a page at a
   time behind a *Show more* button, so the ~190 seeded rules no longer stretch the
   Categories page. Adding a rule jumps the search to it, so it is visible straight away.

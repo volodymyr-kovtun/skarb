@@ -10,8 +10,8 @@ How it behaves:
   then stays quiet. While the account stays low, a reminder goes out once a day. As soon
   as the balance recovers to the limit or above, the alert re-arms for the next drop.
 - **Per account.** Every account gets its own limit (or none) in its own currency, and
-  can send to its own chat — the shared card pings your partner, your own account pings
-  you. Accounts without a chat of their own use the default chat from Settings.
+  names the chat it pings — the shared card alerts your partner, your own account alerts
+  you. Both live together in the account editor; Settings only holds the bot.
 - **As fast as your sync.** With the [Monobank webhook](BANKS.md) enabled, the alert
   lands seconds after the payment that crossed the line. Otherwise it goes out at the
   next background sync round.
@@ -35,25 +35,19 @@ the chats you configure.
 ### 2. Connect it in Skarb
 
 **Settings → Notifications** → paste the token. Skarb validates it and shows the bot's
-@username.
+@username. That is all Settings holds — the limits and recipients live on the accounts.
 
-### 3. Pick who gets the messages
+### 3. Set a limit and pick who gets pinged
 
 A Telegram bot cannot start a conversation — the recipient has to make first contact:
 
 1. The recipient (your partner, you, …) opens the bot by its @username and presses
    **Start** (any message works).
-2. In Skarb, click **Find chats** — everyone who messaged the bot in the last day is
-   listed. Click the right one and **Save**.
-3. **Send test message** confirms the wiring end to end.
-
-The *default chat* receives alerts for every account that doesn't name its own.
-
-### 4. Set limits on accounts
-
-**Accounts → pick an account → Low balance alert**: enter the limit in the account's
-currency — e.g. `5000` on a UAH card. Optionally give the account its own chat ID
-(step 3 shows the IDs) so this one account alerts someone else.
+2. **Accounts → pick the account → Low balance alert**: enter the limit in the
+   account's currency — e.g. `5000` on a UAH card.
+3. Click **Find chats** right below — everyone who messaged the bot in the last day is
+   listed by name. Pick the right one, then **Send a test message to this chat** proves
+   the wiring end to end. **Save**.
 
 Leaving the limit empty turns the alert off for that account. Archived accounts never
 alert — they stop syncing, so their balance means nothing.

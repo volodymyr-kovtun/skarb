@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Skarb.Api.Common.Persistence;
@@ -11,9 +12,11 @@ using Skarb.Api.Common.Persistence;
 namespace Skarb.Api.Migrations
 {
     [DbContext(typeof(SkarbDbContext))]
-    partial class SkarbDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260820124515_MakeAlertChatsPerAccount")]
+    partial class MakeAlertChatsPerAccount
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -343,9 +346,6 @@ namespace Skarb.Api.Migrations
 
                     b.Property<Guid?>("CategoryId")
                         .HasColumnType("uuid");
-
-                    b.Property<string>("CategorySource")
-                        .HasColumnType("text");
 
                     b.Property<string>("CounterIban")
                         .HasColumnType("text");

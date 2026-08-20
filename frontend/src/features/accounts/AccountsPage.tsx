@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Landmark } from 'lucide-react'
-import { api, fmtMoney, refreshAll, type Account } from '../../shared/api'
-import { ACCOUNT_COLORS, Card, ColorPicker, Dot, Modal, ModalActions, bankLabel, btnPrimary, errMsg, fieldLabelCls, inputCls, sectionTitleCls } from '../../shared/ui'
+import { api, fmtMoney, refreshAll, type Account, type TelegramChat } from '../../shared/api'
+import { ACCOUNT_COLORS, Card, ColorPicker, Dot, Modal, ModalActions, bankLabel, btnGhost, btnPrimary, errMsg, fieldLabelCls, inputCls, sectionTitleCls } from '../../shared/ui'
 
 const providerLabel: Record<string, string> = {
   manual: 'Manual',
@@ -146,10 +146,45 @@ function AccountForm({ account, onClose, onSaved }:
   const [excluded, setExcluded] = useState(account?.isExcluded ?? false)
   const [threshold, setThreshold] = useState(account?.lowBalanceThreshold?.toString() ?? '')
   const [alertChat, setAlertChat] = useState(account?.lowBalanceChatId ?? '')
+  const [chats, setChats] = useState<TelegramChat[] | null>(null)
+  const [tgNote, setTgNote] = useState<{ ok: boolean; text: string } | null>(null)
+  const [tgBusy, setTgBusy] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   // Only to warn when alerts are configured but have nowhere to go.
   const { data: telegram } = useQuery({ queryKey: ['telegram'], queryFn: api.telegramSettings, enabled: isEdit })
+
+  const findChats = async () => {
+    setTgBusy(true)
+    setTgNote(null)
+    try {
+      const list = await api.telegramChats()
+      setChats(list)
+      if (list.length === 0)
+        setTgNote({
+          ok: false,
+          text: 'No chats found. The recipient has to open the bot in Telegram and send it anything ' +
+            'first — messages only show up here for about a day.',
+        })
+    } catch (e) {
+      setTgNote({ ok: false, text: errMsg(e) })
+    } finally {
+      setTgBusy(false)
+    }
+  }
+
+  const sendTest = async () => {
+    setTgBusy(true)
+    setTgNote(null)
+    try {
+      const r = await api.telegramTest(alertChat.trim())
+      setTgNote({ ok: true, text: `Test sent to chat ${r.sentTo} — check Telegram.` })
+    } catch (e) {
+      setTgNote({ ok: false, text: errMsg(e) })
+    } finally {
+      setTgBusy(false)
+    }
+  }
 
   const save = async () => {
     setBusy(true)
@@ -157,6 +192,10 @@ function AccountForm({ account, onClose, onSaved }:
     try {
       if (isEdit) {
         const limit = parseFloat(threshold)
+        if (!Number.isNaN(limit) && !alertChat.trim()) {
+          setError('Pick who to ping — Find chats lists everyone who has messaged the bot.')
+          return
+        }
         await api.updateAccount(account!.id, {
           name, color, isArchived: archived, isExcluded: excluded,
           lowBalanceSet: true,
@@ -230,16 +269,45 @@ function AccountForm({ account, onClose, onSaved }:
               </p>
               {threshold.trim() !== '' && (
                 <>
-                  <input className={inputCls + ' mt-2'} placeholder="Telegram chat ID (default from Settings)"
-                    value={alertChat} onChange={(e) => setAlertChat(e.target.value)} />
+                  <div className="mt-2 flex gap-2">
+                    <input className={inputCls} placeholder="Telegram chat ID"
+                      value={alertChat} onChange={(e) => setAlertChat(e.target.value)} />
+                    <button type="button" className={btnGhost + ' shrink-0'} onClick={findChats}
+                      disabled={tgBusy || !telegram?.hasToken}
+                      title="List chats that recently messaged the bot">
+                      Find chats
+                    </button>
+                  </div>
                   <p className="mt-1 text-xs leading-relaxed text-faint">
-                    Who to ping for this account — e.g. the person who tops it up. Empty uses the
-                    default chat from Settings → Notifications.
+                    Who to ping — e.g. the person who tops this account up. They message the bot
+                    once, then Find chats lists them by name.
                   </p>
+                  {chats && chats.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {chats.map((c) => (
+                        <button key={c.id} type="button"
+                          className="rounded-full bg-surface2 px-3 py-1.5 text-xs font-medium transition-colors hover:bg-hover"
+                          onClick={() => { setAlertChat(c.id); setChats(null); setTgNote(null) }}>
+                          {c.name} <span className="text-faint">· {c.id}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {tgNote && (
+                    <p className={`mt-1.5 text-xs font-medium ${tgNote.ok ? 'text-income' : 'text-danger'}`}>
+                      {tgNote.text}
+                    </p>
+                  )}
+                  {alertChat.trim() !== '' && telegram?.hasToken && (
+                    <button type="button" className="mt-1.5 text-xs font-semibold text-muted underline hover:text-ink"
+                      onClick={sendTest} disabled={tgBusy}>
+                      Send a test message to this chat
+                    </button>
+                  )}
                   {telegram && !telegram.hasToken && (
                     <p className="mt-1.5 text-xs font-medium text-danger">
-                      No Telegram bot is connected yet — connect one in Settings → Notifications
-                      or this alert has nowhere to go.
+                      No Telegram bot is connected yet — paste its token in Settings → Notifications
+                      first, or this alert has nowhere to go.
                     </p>
                   )}
                 </>

@@ -102,7 +102,7 @@ public class Account
     public decimal? LowBalanceThreshold { get; set; }
     /// <summary>
     /// Telegram chat this account's alerts go to — e.g. the person who tops the account up.
-    /// Null = the default chat in <see cref="NotificationSettings"/>.
+    /// Picked where the limit is set; without it a limit has nowhere to send.
     /// </summary>
     public string? LowBalanceChatId { get; set; }
     /// <summary>
@@ -116,8 +116,10 @@ public class Account
 }
 
 /// <summary>
-/// Where alerts are delivered. A single row, like <see cref="OwnerAccount"/> — Skarb is
-/// single-tenant and runs one Telegram bot per instance.
+/// The Telegram bot alerts are delivered through. A single row, like
+/// <see cref="OwnerAccount"/> — Skarb is single-tenant and runs one bot per instance.
+/// Who gets pinged is decided per account (<see cref="Account.LowBalanceChatId"/>),
+/// where the alert itself is set.
 /// </summary>
 public class NotificationSettings
 {
@@ -126,8 +128,6 @@ public class NotificationSettings
     public string TelegramBotToken { get; set; } = "";
     /// <summary>The bot's @username, captured when the token is saved, so the UI can say who to message.</summary>
     public string? TelegramBotUsername { get; set; }
-    /// <summary>Chat alerts go to unless an account names its own — see <see cref="Account.LowBalanceChatId"/>.</summary>
-    public string TelegramChatId { get; set; } = "";
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 

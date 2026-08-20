@@ -58,7 +58,7 @@ Built for a PKO BP + ZEN + Monobank setup, but works with 2,500+ European banks.
   - background auto-sync every hour + "Sync now" button
 - **Low-balance alerts to Telegram** — give any account a limit and Skarb messages a
   Telegram chat the moment the balance drops below it (instantly with the Monobank
-  webhook, otherwise at the next sync). Each account can alert its own chat — point the
+  webhook, otherwise at the next sync). Each alert names the chat it pings — point the
   shared card at the person who tops it up. One ping per drop, a daily reminder while it
   stays low, re-armed when the balance recovers. Setup: [docs/ALERTS.md](docs/ALERTS.md).
 - **CSV import** — presets for ZEN and PKO iPKO, configurable column mapping, duplicate-safe re-imports

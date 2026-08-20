@@ -4,6 +4,9 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Per-instance settings (Sync:StartDate, …) live in the machine's user-secret store,
+         never in the tracked appsettings.json — see docs/BANKS.md. -->
+    <UserSecretsId>032aec9e-ce4e-4961-95e5-9786e2bc51e4</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

@@ -163,11 +163,19 @@ no code changes needed.
 
 - A background service syncs every linked connection every **hour**
   (`Sync:IntervalMinutes` in `appsettings.json`; `0` disables it).
-- **`Sync:StartDate` is where the ledger opens.** Set to a date (`"2026-08-01"`), nothing
-  older ever enters Skarb: connectors stop asking their banks for it, and anything a bank
-  volunteers anyway is dropped on the way in — including on a full re-sync. Deleting the
-  older transactions once therefore makes them stay deleted. Leave it out for no cutoff.
-  The boundary is midnight **UTC**, like every other date boundary in Skarb.
+- **`Sync:StartDate` is where the ledger opens** — unset by default, so out of the box you
+  get whatever history each bank offers. Give it a date and nothing older ever enters Skarb:
+  connectors stop asking their banks for it, and anything a bank volunteers anyway is dropped
+  on the way in, including on a full re-sync. Deleting the earlier transactions once therefore
+  makes them stay deleted. The boundary is midnight **UTC**, like every other date boundary
+  in Skarb. It is a per-instance choice, so keep it out of the tracked `appsettings.json`:
+
+  ```bash
+  dotnet user-secrets set "Sync:StartDate" "2026-08-01" --project backend/Skarb.Api
+  ```
+
+  User secrets are read in Development only; elsewhere set `Sync__StartDate=2026-08-01` in
+  the environment (see [DEPLOYMENT.md](DEPLOYMENT.md)).
 - **Sync now** in the sidebar (or per connection in Settings) triggers the same thing
   on demand; progress and results appear under **Settings → Sync activity**.
 - New transactions are auto-categorized: your keyword rules first

@@ -93,6 +93,7 @@ environment variables, which is what you want in a container.
 | `Auth__SessionDays` | How long a session lasts (default 14, sliding). |
 | `Auth__MaxFailedAttempts` / `Auth__LockoutMinutes` | Lockout policy (default 5 attempts → 15 minutes). |
 | `Auth__AllowedOrigins__0` | Only needed if you serve the SPA from a different origin than the API. |
+| `Sync__StartDate` | The day your ledger opens, e.g. `2026-08-01`. Nothing dated earlier is ever synced or imported. Unset means no cutoff. |
 | `ASPNETCORE_ENVIRONMENT` | Must **not** be `Development` in production — that is what switches cookies to `Secure`-always and stops unexpected exception messages reaching the client. |
 
 Example:

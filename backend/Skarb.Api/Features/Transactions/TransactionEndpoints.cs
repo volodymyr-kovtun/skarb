@@ -11,6 +11,15 @@ public record CreateTransactionRequest(
     Guid AccountId, decimal Amount, string? Currency, string Description,
     Guid? CategoryId, List<Guid>? TagIds, DateTime OccurredAt, string? Note);
 
+/// <summary>What a manual category change could be turned into: a keyword rule, and what it covers.</summary>
+public record RuleSuggestionResponse(
+    string? Pattern, List<string> Alternatives, ExistingRuleDto? ExistingRule,
+    RuleMatchCounts Matches, List<TransactionDto> Sample);
+
+public record ExistingRuleDto(Guid Id, string Pattern, CategoryDto Category);
+/// <param name="Untouched">Matches filed by hand, or before provenance was recorded. Left alone by default.</param>
+public record RuleMatchCounts(int Uncategorized, int Automatic, int Untouched);
+
 public record UpdateTransactionRequest(
     string? Description, decimal? Amount, DateTime? OccurredAt, string? Note,
     bool? IsExcluded, bool? IsInternal, bool CategorySet, Guid? CategoryId, List<Guid>? TagIds);
@@ -63,9 +72,10 @@ public class TransactionEndpoints : IEndpointGroup
             return new PagedResult<TransactionDto>(items.Select(t => t.ToDto()).ToList(), total, page, pageSize);
         });
 
-        group.MapPost("/", async (CreateTransactionRequest req, SkarbDbContext db) =>
+        group.MapPost("/", async (
+            CreateTransactionRequest req, SkarbDbContext db, ICategorizer categorizer, CancellationToken ct) =>
         {
-            var account = await db.Accounts.FindAsync(req.AccountId);
+            var account = await db.Accounts.FindAsync([req.AccountId], ct);
             if (account is null) return Results.BadRequest(new { error = "Account not found" });
 
             var tx = new Transaction
@@ -75,10 +85,20 @@ public class TransactionEndpoints : IEndpointGroup
                 Currency = (req.Currency ?? account.Currency).ToUpperInvariant(),
                 Description = req.Description,
                 CategoryId = req.CategoryId,
+                CategorySource = req.CategoryId is null ? null : CategorySources.Manual,
                 OccurredAt = DateTime.SpecifyKind(req.OccurredAt, DateTimeKind.Utc),
                 Note = req.Note,
                 Source = TransactionSources.Manual,
             };
+            // A hand-added transaction deserves the same rules a synced one gets — without this
+            // the only way to categorize one is to do it yourself, every time.
+            if (tx.CategoryId is null)
+            {
+                var probe = new IncomingTransaction(tx.Id.ToString(), tx.Amount, tx.Currency,
+                    tx.Description, tx.OccurredAt, tx.Source) { Note = tx.Note };
+                if (await categorizer.ResolveAsync(probe, ct) is { } verdict)
+                    (tx.CategoryId, tx.CategorySource) = (verdict.CategoryId, verdict.Source);
+            }
             if (req.TagIds is { Count: > 0 })
                 tx.Tags = await db.Tags.Where(t => req.TagIds.Contains(t.Id)).ToListAsync();
 
@@ -104,7 +124,13 @@ public class TransactionEndpoints : IEndpointGroup
             if (req.OccurredAt is DateTime occ) tx.OccurredAt = DateTime.SpecifyKind(occ, DateTimeKind.Utc);
             if (req.Amount is decimal amount && tx.Source == TransactionSources.Manual)
                 tx.Amount = amount;
-            if (req.CategorySet) tx.CategoryId = req.CategoryId;
+            // Choosing a category by hand is a decision, so it is recorded as one: a later bulk
+            // re-file steps around it. Clearing it back to uncategorized decides nothing.
+            if (req.CategorySet)
+            {
+                tx.CategoryId = req.CategoryId;
+                tx.CategorySource = req.CategoryId is null ? null : CategorySources.Manual;
+            }
             if (req.TagIds is not null)
                 tx.Tags = await db.Tags.Where(t => req.TagIds.Contains(t.Id)).ToListAsync();
 
@@ -136,6 +162,51 @@ public class TransactionEndpoints : IEndpointGroup
             return Results.Ok(tx.ToDto());
         });
 
+        // What the manual category change on this transaction could be generalised into. Called
+        // when the offer sheet opens, then again — debounced — as the keyword is edited, so the
+        // counts under the field are always the real ones.
+        group.MapGet("/{id:guid}/rule-suggestion", async (
+            Guid id, string? pattern, SkarbDbContext db, CancellationToken ct) =>
+        {
+            var tx = await db.Transactions.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id, ct);
+            if (tx is null) return Results.NotFound();
+            // Nothing to generalise from a row with no category, and keyword rules never run on
+            // transfers between the owner's own accounts.
+            if (tx.CategoryId is not Guid categoryId || tx.IsInternal)
+                return Results.Ok(Nothing());
+
+            var typed = !string.IsNullOrWhiteSpace(pattern);
+            var suggestion = MerchantKeyword.For(tx.Description, tx.CounterParty, tx.Note, tx.TypeCode);
+            var chosen = typed ? pattern!.Trim() : suggestion.Keyword;
+            if (string.IsNullOrWhiteSpace(chosen)) return Results.Ok(Nothing());
+
+            // Only an exact keyword collision is offered as a repoint. A rule that merely also
+            // fires here ("fee") is someone else's rule and must not be redirected by this row.
+            var existing = await db.CategoryRules.Include(r => r.Category)
+                .FirstOrDefaultAsync(r => r.Pattern.ToLower() == chosen.ToLower(), ct);
+            // A rule that already says what the user just said leaves nothing to offer — but only
+            // suppress the unprompted offer. A keyword typed by hand gets its real counts back
+            // however redundant it turns out to be, rather than a sheet that goes blank.
+            if (!typed && existing is not null && existing.CategoryId == categoryId)
+                return Results.Ok(Nothing());
+
+            var matches = await RuleApplication.FindAsync(db, chosen, categoryId, ct);
+            var alternatives = new[] { suggestion.Keyword }.Concat(suggestion.Alternatives)
+                .Where(a => !string.IsNullOrWhiteSpace(a) && !string.Equals(a, chosen, StringComparison.OrdinalIgnoreCase))
+                .Select(a => a!).Distinct().ToList();
+
+            return Results.Ok(new RuleSuggestionResponse(
+                chosen,
+                alternatives,
+                existing is null ? null : new ExistingRuleDto(existing.Id, existing.Pattern, existing.Category!.ToDto()),
+                new RuleMatchCounts(matches.Uncategorized.Count, matches.Automatic.Count, matches.Untouched.Count),
+                // Newest first across all three buckets — concatenating them would sort by
+                // provenance, which is not how anyone reads a list of their own transactions.
+                matches.InScope(RuleScopes.All)
+                    .OrderByDescending(t => t.OccurredAt).ThenByDescending(t => t.CreatedAt)
+                    .Take(SampleSize).Select(t => t.ToDto()).ToList()));
+        });
+
         group.MapDelete("/{id:guid}", async (Guid id, SkarbDbContext db) =>
         {
             var tx = await db.Transactions.Include(t => t.Account).FirstOrDefaultAsync(t => t.Id == id);
@@ -146,4 +217,11 @@ public class TransactionEndpoints : IEndpointGroup
             return Results.NoContent();
         });
     }
+
+    /// <summary>How many matching transactions the offer sheet shows as evidence for its count.</summary>
+    private const int SampleSize = 3;
+
+    /// <summary>A null pattern is how the API says "do not offer anything here".</summary>
+    private static RuleSuggestionResponse Nothing() =>
+        new(null, [], null, new RuleMatchCounts(0, 0, 0), []);
 }

@@ -51,10 +51,15 @@ public interface ITransactionIngestor
     Task<int> IngestAsync(Account account, IReadOnlyCollection<IncomingTransaction> items, CancellationToken ct);
 }
 
+/// <summary>A category the categorizer picked, and which signal picked it.</summary>
+/// <param name="Source">One of <see cref="Skarb.Api.Common.Domain.CategorySources"/>.</param>
+public sealed record CategoryVerdict(Guid CategoryId, string Source);
+
 /// <summary>Assigns a category to an incoming transaction.</summary>
 public interface ICategorizer
 {
-    Task<Guid?> ResolveAsync(IncomingTransaction item, CancellationToken ct);
+    /// <summary>Null when nothing recognised the transaction — it stays uncategorized.</summary>
+    Task<CategoryVerdict?> ResolveAsync(IncomingTransaction item, CancellationToken ct);
 }
 
 /// <summary>

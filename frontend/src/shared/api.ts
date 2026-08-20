@@ -48,6 +48,27 @@ export type Connection = {
 }
 
 export type Rule = { id: string; pattern: string; priority: number; category: Category }
+
+/** How far back a rule reaches over transactions that already exist. */
+export type RuleScope = 'none' | 'automatic' | 'all'
+/**
+ * Matching transactions the rule would change, split by how much of a decision their current
+ * category was. `untouched` is the ones you filed by hand — plus any filed before Skarb started
+ * recording that — and they are only rewritten when you ask for them by name.
+ */
+export type RuleMatchCounts = { uncategorized: number; automatic: number; untouched: number }
+export type RuleSuggestion = {
+  /** Null means there is nothing worth offering here — don't show the sheet. */
+  pattern: string | null
+  alternatives: string[]
+  /** Set when a rule already claims this exact keyword: repoint it rather than adding a second. */
+  existingRule: { id: string; pattern: string; category: Category } | null
+  matches: RuleMatchCounts
+  sample: Tx[]
+}
+/** One rewritten transaction and what it was filed as before — everything undo needs. */
+export type RuleRevert = { transactionId: string; previousCategoryId: string | null; previousSource: string | null }
+export type RuleApplied = { id: string; applied: number; reverts: RuleRevert[] }
 export type SyncStatus = {
   running: string[]
   logs: { at: string; provider: string; message: string; success: boolean; newTransactions: number }[]
@@ -145,9 +166,18 @@ export const api = {
   deleteTag: (id: string) => del(`/api/tags/${id}`),
 
   rules: () => get<Rule[]>('/api/rules'),
-  createRule: (body: { pattern: string; categoryId: string; priority: number }) => post('/api/rules', body),
+  /** Omitting `priority` lets the server sort the rule ahead of the seeded ones, which is the point. */
+  createRule: (body: { pattern: string; categoryId: string; priority?: number; applyTo?: RuleScope }) =>
+    post<RuleApplied>('/api/rules', body),
+  updateRule: (id: string, body: { categoryId: string; pattern?: string; applyTo?: RuleScope }) =>
+    patch<RuleApplied>(`/api/rules/${id}`, body),
   deleteRule: (id: string) => del(`/api/rules/${id}`),
   applyRules: () => post<{ scanned: number; categorized: number }>('/api/rules/apply'),
+  revertRules: (entries: RuleRevert[]) => post<{ reverted: number }>('/api/rules/revert', { entries }),
+  /** What a manual category change on this transaction could become. Omit `pattern` for the guess. */
+  ruleSuggestion: (txId: string, pattern?: string) =>
+    get<RuleSuggestion>(`/api/transactions/${txId}/rule-suggestion` +
+      (pattern ? `?pattern=${encodeURIComponent(pattern)}` : '')),
 
   connections: () => get<Connection[]>('/api/connections'),
   renameConnection: (id: string, displayName: string) =>

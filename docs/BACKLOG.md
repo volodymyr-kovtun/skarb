@@ -57,9 +57,12 @@ answer one of them.
 ## Unrecognized transaction reminder
 
 **What.** A steady nudge toward the goal that **every** transaction carries a
-category: a visible count of what still needs one, a fast way to work through
-the list, and an offer to turn each manual decision into a rule so the same
-merchant never has to be sorted twice.
+category: a visible count of what still needs one, and a fast way to work
+through the list.
+
+Turning each manual decision into a rule is done — correcting a category offers
+the keyword, shows what it matches, and files the past on one click. What is
+left is being *pointed at* the pile in the first place.
 
 **Why.** Auto-categorization gets most rows right — keyword rules first, then
 MCC for card payments — and quietly leaves the rest uncategorized. Nothing ever
@@ -75,9 +78,6 @@ every number on the overview gets a little less true.
 - A review queue that opens the oldest uncategorized transaction, takes one
   keystroke per category, and moves to the next. Grouping by merchant first, so
   eleven Żabka rows are one decision rather than eleven.
-- After a manual categorization, offer the rule: *"always file BIEDRONKA under
-  Groceries?"*. The rule engine and `POST /api/rules` already exist; this is the
-  missing prompt that would make them accumulate on their own.
 - Optionally a weekly digest once notifications exist at all — Skarb sends
   nothing today, and that is a feature, so any reminder should be in-app first.
 
@@ -86,11 +86,11 @@ every number on the overview gets a little less true.
 - What counts as needing attention? Internal transfers and excluded rows should
   not, and neither should a transaction that is minutes old and might still be
   a pending hold the bank will restate.
-- Should a rule created from one transaction be applied backwards to matching
-  older ones? "Apply to uncategorized" already exists as a manual action —
-  perhaps the offer is simply to run it.
 - Is there a point where a merchant with no obvious category should be allowed
   to stay uncategorized permanently, instead of being asked about forever?
+- The review queue wants a category picker on the row itself rather than the
+  edit modal, with the rule offer behind it. That is a second entry point into
+  a flow that already works — worth confirming it should be the *only* one.
 
 ---
 

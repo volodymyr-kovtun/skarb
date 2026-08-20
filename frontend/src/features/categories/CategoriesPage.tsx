@@ -221,7 +221,9 @@ function RulesCard() {
   const add = async () => {
     if (!pattern.trim() || !categoryId) return
     const added = pattern.trim()
-    await api.createRule({ pattern: added, categoryId, priority: (rules?.length ?? 0) + 1 })
+    // No priority: the server sorts a hand-written rule ahead of the seeded ones, which is the
+    // only way it can beat a broad default like "supermarket" or "fee".
+    await api.createRule({ pattern: added, categoryId })
     setPattern('')
     // A new rule sorts to the bottom of a long list — search for it so it is visible.
     searchFor(added)
@@ -243,7 +245,8 @@ function RulesCard() {
           When a new transaction's description contains a keyword, it gets the category automatically —
           e.g. <code className="rounded-md bg-surface2 px-2 py-0.5 text-[12.5px]">ibkr</code> → 📈 Brokerage counts as investing.
           Rules apply to new transactions as they arrive; use <em>Apply to uncategorized</em> to run them
-          over existing ones (it never overrides a category you set by hand).
+          over existing ones (it only fills blanks). Most rules are easier to make by changing a
+          category on a transaction and accepting the offer that follows.
         </p>
         {applyMsg && <p className="mb-4 rounded-row bg-income/10 px-4 py-2.5 text-sm font-medium text-income">{applyMsg}</p>}
         <div className="flex flex-wrap gap-2.5">

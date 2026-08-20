@@ -59,6 +59,24 @@ All notable changes to Skarb are documented here. The format follows
 - Investment tracking via investment-kind categories (Brokerage, Crypto seeded; IBKR rules).
 - Category management with emoji, color, kind and keyword auto-categorization rules;
   built-in MCC mapping for card transactions.
+- **Rules learned from corrections.** Changing a category by hand offers to turn that one
+  correction into a keyword rule: Skarb derives the merchant keyword from the bank descriptor
+  ("JMP S.A. BIEDRONKA 7184" → `biedronka`), shows how many transactions it matches and three
+  of them as evidence, and files them all on one click. The keyword is editable and the counts
+  follow it as you type, so a wrong guess costs a correction rather than a bad rule. The offer
+  appears after the save, never before it, so dismissing it leaves the transaction corrected.
+  When a rule already claims the keyword it offers to repoint that rule rather than stack a
+  second one beside it for the two to disagree over. A bulk re-file can be undone from the
+  toast that follows, rule and all.
+- Transactions now record **which signal chose their category** — a keyword rule, the MCC map,
+  one of the categorizer's fallbacks, or you. A bulk re-file rewrites the guesses and steps
+  around the decisions; rows you sorted by hand are only touched if you ask for them by name,
+  as are rows from before this was recorded. Transactions added by hand run through the rules
+  too, which they previously did not.
+- Hand-written rules now sort **ahead** of the ~200 seeded ones rather than behind them.
+  Rules are evaluated lowest-priority-first, and a new rule used to be given a priority past
+  the end of the table, so a keyword you added yourself silently lost to broad built-ins like
+  `supermarket` or `fee`.
 - A **Donations** category, routed primarily by MCC 8398 rather than by keyword: a Monobank
   jar top-up reads the same whether the jar belongs to a charity or to your own savings, and
   only the merchant code tells the two apart. Named funds and unambiguous words

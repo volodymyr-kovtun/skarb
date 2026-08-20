@@ -40,6 +40,24 @@ public static class InternalSources
     public const string Manual = "manual";
 }
 
+/// <summary>
+/// Which signal decided <see cref="Transaction.CategoryId"/>. <see cref="Manual"/> means the user
+/// chose it, so a bulk re-file leaves it alone — the same courtesy <see cref="InternalSources"/>
+/// extends to a transfer the user marked by hand. Null is a row from before this was recorded:
+/// provenance unknown, so it is treated as manual and left alone too.
+/// </summary>
+public static class CategorySources
+{
+    /// <summary>A <see cref="CategoryRule"/> keyword hit.</summary>
+    public const string Rule = "rule";
+    /// <summary>The ISO 18245 merchant-category-code range map.</summary>
+    public const string Mcc = "mcc";
+    /// <summary>The categorizer's own fallbacks — person-to-person rails, small anonymous credits.</summary>
+    public const string Heuristic = "heuristic";
+    /// <summary>Set by the user, never by detection.</summary>
+    public const string Manual = "manual";
+}
+
 public static class ConnectionStatuses
 {
     public const string Pending = "pending";
@@ -100,6 +118,11 @@ public class Transaction
     public string? TypeCode { get; set; }
     public Guid? CategoryId { get; set; }
     public Category? Category { get; set; }
+    /// <summary>
+    /// Which signal set <see cref="CategoryId"/> — see <see cref="CategorySources"/>. Null means
+    /// nothing recorded it, which a bulk re-file reads as "the user might have chosen this".
+    /// </summary>
+    public string? CategorySource { get; set; }
     public List<Tag> Tags { get; set; } = [];
     public DateTime OccurredAt { get; set; }
     public string Source { get; set; } = TransactionSources.Manual;

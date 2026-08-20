@@ -44,8 +44,11 @@ public class TransactionIngestor(SkarbDbContext db, ICategorizer categorizer) : 
                 OccurredAt = item.OccurredAtUtc,
                 Source = item.Source,
                 Note = item.Note,
-                CategoryId = await categorizer.ResolveAsync(item, ct),
             };
+            // Recording which signal filed it is what later lets a bulk re-file tell a guess
+            // apart from a decision the user made.
+            if (await categorizer.ResolveAsync(item, ct) is { } verdict)
+                (tx.CategoryId, tx.CategorySource) = (verdict.CategoryId, verdict.Source);
             db.Transactions.Add(tx);
             existing[item.ExternalId] = tx; // in-batch duplicates hit the update path above
             created++;

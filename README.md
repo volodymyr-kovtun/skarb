@@ -44,6 +44,12 @@ Built for a PKO BP + ZEN + Monobank setup, but works with 2,500+ European banks.
 - **Category management** — full CRUD with emoji, color and kind, usage counts, plus
   keyword auto-categorization rules, built-in MCC mapping for Monobank, and the tags
   themselves (rename, recolor, delete)
+- **Rules that learn from you** — correct a category once and Skarb offers to remember it:
+  it reads the merchant out of the bank descriptor (`JMP S.A. BIEDRONKA 7184` → `biedronka`),
+  shows what that keyword matches across your history, and files those transactions with it —
+  and every future one. It knows the difference between a category it guessed and one you
+  chose, so a bulk re-file never overwrites a decision you made on purpose, and the whole
+  thing can be undone from the toast that follows.
 - **Bank sync**
   - **Monobank** — direct personal API; instant push sync via webhook (optional)
   - **PKO BP + any Enable Banking bank** — the picker lists every supported institution

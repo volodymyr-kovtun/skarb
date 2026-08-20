@@ -219,13 +219,16 @@ export function dayLabel(iso: string) {
   return format(d, 'EEEE, d MMMM')
 }
 
+/** Without an <code>onClick</code> the row is being shown as evidence, not offered as a control. */
 export function TxRow({ tx, onClick }: { tx: Tx; onClick?: () => void }) {
   const dark = useIsDark()
   const dimmed = tx.isInternal || tx.isExcluded
+  const Row = onClick ? 'button' : 'div'
   return (
-    <button
+    <Row
       onClick={onClick}
-      className="flex w-full items-center gap-3.5 rounded-row px-3 py-2.5 text-left transition-colors hover:bg-hover"
+      className={`flex w-full items-center gap-3.5 rounded-row px-3 py-2.5 text-left ${
+        onClick ? 'transition-colors hover:bg-hover' : ''}`}
     >
       {tx.isInternal ? (
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-tile bg-surface2 text-faint" aria-hidden>
@@ -253,6 +256,6 @@ export function TxRow({ tx, onClick }: { tx: Tx; onClick?: () => void }) {
         </p>
       </div>
       <Money amount={tx.amount} currency={tx.currency} signed={!dimmed} muted={dimmed} className="text-[14.5px] font-semibold" />
-    </button>
+    </Row>
   )
 }

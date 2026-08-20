@@ -46,33 +46,21 @@ public class RuleBasedCategorizer(SkarbDbContext db) : ICategorizer
     private List<(string Pattern, Guid CategoryId, string Kind)>? _rules;
     private Dictionary<string, Guid>? _categoriesBySystemKey;
 
-    public async Task<Guid?> ResolveAsync(IncomingTransaction item, CancellationToken ct)
+    public async Task<CategoryVerdict?> ResolveAsync(IncomingTransaction item, CancellationToken ct)
     {
-        var (description, counterParty, mcc, amount) = (item.Description, item.CounterParty, item.Mcc, item.Amount);
-        // Rules match against description, counterparty, the raw bank note and the type code,
-        // so "FEE" or "CARD-ATM" can be targeted even when the description is a merchant name.
-        var haystack = $"{description} {counterParty} {item.Note} {item.TypeCode}";
+        var (counterParty, mcc, amount) = (item.CounterParty, item.Mcc, item.Amount);
+        var haystack = Haystack(item.Description, counterParty, item.Note, item.TypeCode);
 
         _rules ??= await db.CategoryRules.AsNoTracking()
             .OrderBy(r => r.Priority)
             .Select(r => new ValueTuple<string, Guid, string>(r.Pattern, r.CategoryId, r.Category!.Kind))
             .ToListAsync(ct);
-        // Card-terminal descriptors arrive glued together ("WARSZAWAFOUNDATIONCOFFEE.PL",
-        // "mesGymBeamSK"), so word boundaries can't be trusted there — fall back to substring
-        // matching for card rows; everything else (transfers, notes) gets whole-word matching.
-        var isCardRow = item.TypeCode?.StartsWith("CARD", StringComparison.OrdinalIgnoreCase) ?? false;
 
         foreach (var (pattern, categoryId, kind) in _rules)
         {
-            // A rule only applies in the direction its category describes: income categories to
-            // money in, spending/investment categories to money out. Prevents "zwrot" (refund) on an
-            // outgoing repayment or "salary"-like words on an outgoing transfer from misfiring.
-            var directionOk = kind == CategoryKinds.Income ? amount > 0 : amount < 0;
-            if (!directionOk || string.IsNullOrWhiteSpace(pattern)) continue;
-            var hit = isCardRow
-                ? haystack.Contains(pattern, StringComparison.OrdinalIgnoreCase)
-                : Matches(haystack, pattern);
-            if (hit) return categoryId;
+            if (!DirectionAllows(kind, amount)) continue;
+            if (RuleHits(haystack, item.TypeCode, pattern))
+                return new CategoryVerdict(categoryId, CategorySources.Rule);
         }
 
         _categoriesBySystemKey ??= await db.Categories.AsNoTracking()
@@ -84,33 +72,67 @@ public class RuleBasedCategorizer(SkarbDbContext db) : ICategorizer
             // Genuine person-to-person rails (BLIK phone transfers etc.) are gifts/repayments, not cashback.
             // A plain named-counterparty bank transfer could equally be an employer or a client, so
             // that is left for the user to classify once (then a keyword rule covers the future).
-            var isP2P = (item.TypeCode?.Contains("C2C", StringComparison.OrdinalIgnoreCase) ?? false) ||
-                        (item.TypeCode?.Contains("MOBILE-PAYMENT", StringComparison.OrdinalIgnoreCase) ?? false);
+            var isP2P = IsPersonToPerson(item.TypeCode);
             if (isP2P && _categoriesBySystemKey.TryGetValue("transfers-in", out var fromPeople))
-                return fromPeople;
+                return new CategoryVerdict(fromPeople, CategorySources.Heuristic);
             // Small anonymous credits (card cashback, interest) — large ones stay for the user (salary vs refund).
             var anonymous = string.IsNullOrWhiteSpace(counterParty) && !isP2P;
             if (amount < 50 && anonymous && _categoriesBySystemKey.TryGetValue("interest-cashback", out var income))
-                return income;
+                return new CategoryVerdict(income, CategorySources.Heuristic);
             return null;
         }
 
         // Outgoing money over person-to-person rails (BLIK phone transfers etc.).
-        var outP2P = (item.TypeCode?.Contains("C2C", StringComparison.OrdinalIgnoreCase) ?? false) ||
-                     (item.TypeCode?.Contains("MOBILE-PAYMENT", StringComparison.OrdinalIgnoreCase) ?? false);
-        if (outP2P && _categoriesBySystemKey.TryGetValue("transfers-out", out var toPeople))
-            return toPeople;
+        if (IsPersonToPerson(item.TypeCode) && _categoriesBySystemKey.TryGetValue("transfers-out", out var toPeople))
+            return new CategoryVerdict(toPeople, CategorySources.Heuristic);
 
         if (mcc is int code)
         {
             foreach (var (from, to, key) in MccMap)
             {
                 if (code >= from && code <= to && _categoriesBySystemKey.TryGetValue(key, out var id))
-                    return id;
+                    return new CategoryVerdict(id, CategorySources.Mcc);
             }
         }
 
         return null;
+    }
+
+    private static bool IsPersonToPerson(string? typeCode) =>
+        (typeCode?.Contains("C2C", StringComparison.OrdinalIgnoreCase) ?? false) ||
+        (typeCode?.Contains("MOBILE-PAYMENT", StringComparison.OrdinalIgnoreCase) ?? false);
+
+    /// <summary>
+    /// The text a rule is matched against: description, counterparty, the raw bank note and the
+    /// type code, so "FEE" or "CARD-ATM" can be targeted even when the description is a merchant name.
+    /// </summary>
+    public static string Haystack(string? description, string? counterParty, string? note, string? typeCode) =>
+        $"{description} {counterParty} {note} {typeCode}";
+
+    /// <summary>
+    /// A rule only applies in the direction its category describes: income categories to money in,
+    /// spending/investment categories to money out. Prevents "zwrot" (refund) on an outgoing
+    /// repayment or "salary"-like words on an outgoing transfer from misfiring.
+    /// </summary>
+    public static bool DirectionAllows(string categoryKind, decimal amount) =>
+        categoryKind == CategoryKinds.Income ? amount > 0 : amount < 0;
+
+    /// <summary>
+    /// Whether one rule pattern fires on one row. The single place that answers this, so a
+    /// match preview cannot promise rows that ingest would then file differently.
+    /// </summary>
+    /// <remarks>
+    /// Card-terminal descriptors arrive glued together ("WARSZAWAFOUNDATIONCOFFEE.PL",
+    /// "mesGymBeamSK"), so word boundaries can't be trusted there — card rows fall back to
+    /// substring matching; everything else (transfers, notes) gets whole-word matching.
+    /// </remarks>
+    public static bool RuleHits(string haystack, string? typeCode, string pattern)
+    {
+        if (string.IsNullOrWhiteSpace(pattern)) return false;
+        var isCardRow = typeCode?.StartsWith("CARD", StringComparison.OrdinalIgnoreCase) ?? false;
+        return isCardRow
+            ? haystack.Contains(pattern, StringComparison.OrdinalIgnoreCase)
+            : Matches(haystack, pattern);
     }
 
     /// <summary>

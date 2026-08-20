@@ -3,12 +3,15 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { ArrowLeftRight, ChevronDown, Plus, Search, Tag as TagIcon, X } from 'lucide-react'
-import { accountLabel, api, refreshAll, type Meta, type Tag, type Tx } from '../../shared/api'
+import {
+  accountLabel, api, refreshAll, type Category, type Meta, type RuleSuggestion, type Tag, type Tx,
+} from '../../shared/api'
 import {
   Card, Modal, ModalActions, TxRow, btnGhost, btnPrimary, dayLabel, errMsg, fieldLabelCls, inputCls, labelCls, pillCls,
 } from '../../shared/ui'
 import { useIsDark } from '../../shared/theme'
 import { swatch } from '../../shared/color'
+import { RuleOfferSheet } from './RuleOfferSheet'
 
 /** Account and category filters: a native select wearing the same pill as everything else. */
 const selectPill =
@@ -36,6 +39,9 @@ export default function TransactionsPage() {
   const [page, setPage] = useState(1)
   const [editing, setEditing] = useState<Tx | null>(null)
   const [adding, setAdding] = useState(false)
+  // A category just changed by hand, and what Skarb would make of it. Held here rather than in
+  // the editor so the offer outlives the modal that produced it.
+  const [offer, setOffer] = useState<{ tx: Tx; category: Category; suggestion: RuleSuggestion } | null>(null)
 
   // Debounce typing so we don't fire a search request per keystroke.
   useEffect(() => {
@@ -78,6 +84,21 @@ export default function TransactionsPage() {
 
   const refresh = () => refreshAll(qc)
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1
+
+  /**
+   * After a category is set by hand, ask whether it should become a rule. The save has already
+   * landed, so this is pure upside: if the suggestion can't be fetched, or there is nothing worth
+   * suggesting, the transaction is simply left as corrected.
+   */
+  const askAboutRule = async (tx: Tx) => {
+    if (!tx.category) return
+    try {
+      const suggestion = await api.ruleSuggestion(tx.id)
+      if (suggestion.pattern) setOffer({ tx, category: tx.category, suggestion })
+    } catch {
+      /* never let the offer get in the way of the edit that already worked */
+    }
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -159,7 +180,20 @@ export default function TransactionsPage() {
         <TxForm meta={meta} onClose={() => setAdding(false)} onSaved={() => { setAdding(false); refresh() }} />
       )}
       {editing && meta && (
-        <TxForm meta={meta} tx={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); refresh() }} />
+        <TxForm
+          meta={meta}
+          tx={editing}
+          onClose={() => setEditing(null)}
+          onSaved={(recategorized) => { setEditing(null); refresh(); if (recategorized) askAboutRule(recategorized) }}
+        />
+      )}
+      {offer && (
+        <RuleOfferSheet
+          tx={offer.tx}
+          category={offer.category}
+          initial={offer.suggestion}
+          onClose={() => setOffer(null)}
+        />
       )}
     </div>
   )
@@ -254,8 +288,12 @@ function TagFilter({ tags, selected, onChange }:
   )
 }
 
+/**
+ * @param onSaved Receives the saved transaction when this edit changed its category to a new one,
+ *   which is what the page needs in order to offer a rule for it.
+ */
 function TxForm({ meta, tx, onClose, onSaved }:
-  { meta: Meta; tx?: Tx; onClose: () => void; onSaved: () => void }) {
+  { meta: Meta; tx?: Tx; onClose: () => void; onSaved: (recategorized?: Tx) => void }) {
   const qc = useQueryClient()
   const dark = useIsDark()
   const isEdit = !!tx
@@ -288,7 +326,7 @@ function TxForm({ meta, tx, onClose, onSaved }:
         return
       }
       if (isEdit) {
-        await api.updateTransaction(tx!.id, {
+        const saved = await api.updateTransaction(tx!.id, {
           description: description.trim(),
           amount: tx!.source === 'manual' ? signed : undefined,
           occurredAt: date + 'T12:00:00Z',
@@ -299,17 +337,22 @@ function TxForm({ meta, tx, onClose, onSaved }:
           categoryId: categoryId || null,
           tagIds,
         })
-      } else {
-        await api.createTransaction({
-          accountId,
-          amount: signed,
-          description: description.trim(),
-          categoryId: categoryId || null,
-          tagIds,
-          occurredAt: date + 'T12:00:00Z',
-          note: note || null,
-        })
+        // Only a change to a real category is worth generalising — clearing one, or re-saving
+        // the category it already had, teaches nothing.
+        const changed = !!categoryId && categoryId !== (tx!.category?.id ?? '')
+        onSaved(changed && !saved.isInternal ? saved : undefined)
+        return
       }
+
+      await api.createTransaction({
+        accountId,
+        amount: signed,
+        description: description.trim(),
+        categoryId: categoryId || null,
+        tagIds,
+        occurredAt: date + 'T12:00:00Z',
+        note: note || null,
+      })
       onSaved()
     } catch (e) {
       setError(errMsg(e))

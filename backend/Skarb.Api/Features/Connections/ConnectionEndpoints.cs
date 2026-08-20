@@ -11,6 +11,7 @@ public record ConnectionDto(
     Guid Id, string Provider, string DisplayName, string Status,
     DateTime? LastSyncedAt, string? LastError, int AccountCount, DateTime? ConsentValidUntil);
 
+public record UpdateConnectionRequest(string DisplayName);
 public record MonobankConnectRequest(string Token);
 public record MonobankWebhookRequest(string PublicBaseUrl);
 public record EnableBankingConnectRequest(string DisplayName, string ApplicationId, string PrivateKeyPem);
@@ -28,21 +29,33 @@ public class ConnectionEndpoints : IEndpointGroup
             var connections = await db.Connections.OrderBy(c => c.CreatedAt)
                 .Select(c => new { Conn = c, AccountCount = c.Accounts.Count })
                 .ToListAsync();
-            return connections.Select(x =>
-            {
-                DateTime? validUntil = null;
-                if (x.Conn.Provider == ProviderNames.EnableBanking)
-                    validUntil = EnableBankingSettings.From(x.Conn).ValidUntil;
-                return new ConnectionDto(x.Conn.Id, x.Conn.Provider, x.Conn.DisplayName, x.Conn.Status,
-                    x.Conn.LastSyncedAt, x.Conn.LastError, x.AccountCount, validUntil);
-            });
+            return connections.Select(x => ToDto(x.Conn, x.AccountCount));
+        });
+
+        group.MapPatch("/{id:guid}", async (Guid id, UpdateConnectionRequest req, SkarbDbContext db) =>
+        {
+            var conn = await db.Connections.Include(c => c.Accounts).FirstOrDefaultAsync(c => c.Id == id);
+            if (conn is null) return Results.NotFound();
+            var name = req.DisplayName?.Trim();
+            if (string.IsNullOrWhiteSpace(name))
+                return Results.BadRequest(new { error = "Name is required" });
+            // The institution shown on an account is this name, copied when the account was
+            // discovered — carry the rename over so grouping by bank follows it everywhere.
+            foreach (var account in conn.Accounts.Where(a => a.Bank == conn.DisplayName))
+                account.Bank = name;
+            conn.DisplayName = name;
+            await db.SaveChangesAsync();
+            return Results.Ok(ToDto(conn, conn.Accounts.Count));
         });
 
         group.MapDelete("/{id:guid}", async (Guid id, SkarbDbContext db) =>
         {
-            var conn = await db.Connections.FindAsync(id);
+            var conn = await db.Connections.Include(c => c.Accounts).FirstOrDefaultAsync(c => c.Id == id);
             if (conn is null) return Results.NotFound();
-            db.Connections.Remove(conn); // accounts stay (FK set to null), history is preserved
+            // The accounts exist only because this connection created them, so they go with it —
+            // their transactions cascade. Manually created accounts are never linked to a connection.
+            db.Accounts.RemoveRange(conn.Accounts);
+            db.Connections.Remove(conn);
             await db.SaveChangesAsync();
             return Results.NoContent();
         });
@@ -143,5 +156,14 @@ public class ConnectionEndpoints : IEndpointGroup
             await sync.TriggerAsync(conn.Id);
             return Results.Ok(new { status = conn.Status });
         });
+    }
+
+    private static ConnectionDto ToDto(BankConnection conn, int accountCount)
+    {
+        DateTime? validUntil = conn.Provider == ProviderNames.EnableBanking
+            ? EnableBankingSettings.From(conn).ValidUntil
+            : null;
+        return new ConnectionDto(conn.Id, conn.Provider, conn.DisplayName, conn.Status,
+            conn.LastSyncedAt, conn.LastError, accountCount, validUntil);
     }
 }

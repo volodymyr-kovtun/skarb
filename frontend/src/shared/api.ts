@@ -148,6 +148,8 @@ export const api = {
   applyRules: () => post<{ scanned: number; categorized: number }>('/api/rules/apply'),
 
   connections: () => get<Connection[]>('/api/connections'),
+  renameConnection: (id: string, displayName: string) =>
+    patch<Connection>(`/api/connections/${id}`, { displayName }),
   deleteConnection: (id: string) => del(`/api/connections/${id}`),
   connectMonobank: (token: string) => post<{ id: string }>('/api/connections/monobank', { token }),
   setMonobankWebhook: (id: string, publicBaseUrl: string) =>

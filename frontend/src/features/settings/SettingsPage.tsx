@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { formatDistanceToNow, parseISO } from 'date-fns'
-import { Landmark, Plug, Upload, Trash2, RefreshCw, Webhook, CheckCircle2, AlertCircle, History } from 'lucide-react'
+import { Landmark, Plug, Upload, Trash2, RefreshCw, Webhook, CheckCircle2, AlertCircle, History, Pencil } from 'lucide-react'
 import { accountLabel, api, refreshAll, type Connection, type Meta } from '../../shared/api'
 import { Card, CardHeader, Modal, btnGhost, btnPrimary, errMsg, fieldLabelCls, inputCls } from '../../shared/ui'
 import { SecuritySettings } from '../auth/SecuritySettings'
@@ -112,6 +112,7 @@ export default function SettingsPage() {
 
 function ConnectionRow({ c, onChanged }: { c: Connection; onChanged: () => void }) {
   const [webhookOpen, setWebhookOpen] = useState(false)
+  const [renameOpen, setRenameOpen] = useState(false)
   const statusChip =
     c.status === 'linked' ? 'bg-income/15 text-income' :
     c.status === 'error' ? 'bg-danger/15 text-danger' : 'bg-surface text-muted'
@@ -134,6 +135,10 @@ function ConnectionRow({ c, onChanged }: { c: Connection; onChanged: () => void 
           </p>
         </div>
         <div className="ml-auto flex items-center gap-0.5">
+          <button title="Rename connection" className="rounded-full p-2.5 text-muted transition-colors hover:bg-hover hover:text-ink"
+            onClick={() => setRenameOpen(true)}>
+            <Pencil size={16} />
+          </button>
           {c.provider === 'monobank' && (
             <button title="Instant sync (webhook)" className="rounded-full p-2.5 text-muted transition-colors hover:bg-hover hover:text-ink" onClick={() => setWebhookOpen(true)}>
               <Webhook size={16} />
@@ -150,7 +155,11 @@ function ConnectionRow({ c, onChanged }: { c: Connection; onChanged: () => void 
           </button>
           <button title="Remove connection" className="rounded-full p-2.5 text-muted transition-colors hover:bg-hover hover:text-danger"
             onClick={async () => {
-              if (confirm(`Remove ${c.displayName}? Accounts and transactions are kept.`)) {
+              const accounts = c.accountCount === 1 ? 'Its 1 account' : `Its ${c.accountCount} accounts`
+              const warning = c.accountCount === 0
+                ? `Remove ${c.displayName}?`
+                : `Remove ${c.displayName}? ${accounts} and every transaction on them will be deleted. This cannot be undone.`
+              if (confirm(warning)) {
                 await api.deleteConnection(c.id)
                 onChanged()
               }
@@ -161,7 +170,50 @@ function ConnectionRow({ c, onChanged }: { c: Connection; onChanged: () => void 
       </div>
       {c.lastError && <p className="mt-3 rounded-row bg-danger/10 px-3.5 py-2.5 text-xs font-medium text-danger">{c.lastError}</p>}
       {webhookOpen && <WebhookModal connectionId={c.id} onClose={() => setWebhookOpen(false)} />}
+      {renameOpen && (
+        <RenameConnectionModal c={c} onClose={() => setRenameOpen(false)} onDone={() => { setRenameOpen(false); onChanged() }} />
+      )}
     </div>
+  )
+}
+
+function RenameConnectionModal({ c, onClose, onDone }: { c: Connection; onClose: () => void; onDone: () => void }) {
+  const [name, setName] = useState(c.displayName)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const save = async () => {
+    setBusy(true)
+    setError('')
+    try {
+      await api.renameConnection(c.id, name.trim())
+      onDone()
+    } catch (e) {
+      setError(errMsg(e, 'Rename failed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal title="Rename connection" onClose={onClose}>
+      <label className="text-sm">
+        <span className={fieldLabelCls}>Connection name</span>
+        <input className={inputCls} value={name} autoFocus placeholder="PKO Bank Polski"
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) save() }} />
+      </label>
+      <p className="mt-2 text-xs text-faint">
+        Accounts synced through this connection are grouped under this name — renaming it relabels them too.
+      </p>
+      {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+      <div className="mt-5 flex justify-end gap-2">
+        <button className={btnGhost} onClick={onClose}>Cancel</button>
+        <button className={btnPrimary} onClick={save} disabled={busy || !name.trim() || name.trim() === c.displayName}>
+          {busy ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+    </Modal>
   )
 }
 

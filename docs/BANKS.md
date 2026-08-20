@@ -4,8 +4,8 @@ Verified August 2026. Three banks, three different realities:
 
 | Bank | Method | Auto-sync | Effort |
 |---|---|---|---|
-| **Monobank** 🇺🇦 | Official personal API, direct | ✅ every 30 min, **instant with webhook** | 2 minutes |
-| **PKO Bank Polski** 🇵🇱 | Enable Banking (licensed PSD2 aggregator, free personal tier) | ✅ every 30 min | ~20 minutes, once |
+| **Monobank** 🇺🇦 | Official personal API, direct | ✅ hourly, **instant with webhook** | 2 minutes |
+| **PKO Bank Polski** 🇵🇱 | Enable Banking (licensed PSD2 aggregator, free personal tier) | ✅ hourly | ~20 minutes, once |
 | **ZEN.com** | CSV statement import | ❌ manual (monthly file) | 1 minute per import |
 
 ---
@@ -161,7 +161,7 @@ no code changes needed.
 
 ## How syncing works inside Skarb
 
-- A background service syncs every linked connection every **30 minutes**
+- A background service syncs every linked connection every **hour**
   (`Sync:IntervalMinutes` in `appsettings.json`; `0` disables it).
 - **Sync now** in the sidebar (or per connection in Settings) triggers the same thing
   on demand; progress and results appear under **Settings → Sync activity**.

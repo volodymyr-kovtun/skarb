@@ -60,7 +60,7 @@ All notable changes to Skarb are documented here. The format follows
 - Removing a bank connection now deletes the accounts it created and their transactions,
   instead of leaving orphaned accounts behind. Manually created accounts are untouched, and
   the confirmation says exactly how much is going.
-- Background auto-sync every 30 minutes and on-demand "Sync now".
+- Background auto-sync every hour and on-demand "Sync now".
 - PostgreSQL storage via Docker Compose, EF Core migrations, `make`-driven workflow.
 - Building the API builds the SPA into `wwwroot` when the frontend changed, so running from
   an IDE or a bare `dotnet run` never serves a stale bundle (`-p:SkipSpa=true` opts out).

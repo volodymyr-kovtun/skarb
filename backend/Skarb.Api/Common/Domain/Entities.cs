@@ -204,8 +204,24 @@ public class BankConnection
     public string Status { get; set; } = ConnectionStatuses.Pending;
     public DateTime? LastSyncedAt { get; set; }
     public string? LastError { get; set; }
+    /// <summary>
+    /// Provider-side ids of accounts the owner deleted. Sync discovers accounts afresh every
+    /// round and would recreate anything missing, so a delete is remembered here instead —
+    /// otherwise unwanted cards come back on the next sync.
+    /// </summary>
+    public List<string> IgnoredExternalIds { get; set; } = [];
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public List<Account> Accounts { get; set; } = [];
+
+    /// <summary>
+    /// Stops sync from recreating this provider-side account. Idempotent, and assigns a new
+    /// list rather than mutating in place so EF sees the change.
+    /// </summary>
+    public void Ignore(string externalId)
+    {
+        if (!IgnoredExternalIds.Contains(externalId))
+            IgnoredExternalIds = [.. IgnoredExternalIds, externalId];
+    }
 }
 
 /// <summary>Keyword rule applied to uncategorized transactions on ingest.</summary>

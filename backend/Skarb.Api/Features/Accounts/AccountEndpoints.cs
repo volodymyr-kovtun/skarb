@@ -74,6 +74,11 @@ public class AccountEndpoints : IEndpointGroup
         {
             var account = await db.Accounts.FindAsync(id);
             if (account is null) return Results.NotFound();
+            // Sync rediscovers every account the bank reports, so deleting a synced one is not
+            // enough on its own — the next round would create it again, transactions and all.
+            // Remembering the provider-side id on the connection is what makes a delete stick.
+            if (account.ConnectionId is { } connectionId && account.ExternalId is { } externalId)
+                (await db.Connections.FindAsync(connectionId))?.Ignore(externalId);
             db.Accounts.Remove(account);
             await db.SaveChangesAsync();
             return Results.NoContent();

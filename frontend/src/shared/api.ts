@@ -49,6 +49,8 @@ export type Connection = {
   id: string; provider: string; displayName: string; status: string
   lastSyncedAt: string | null; lastError: string | null
   accountCount: number; consentValidUntil: string | null
+  /** Accounts deleted from this connection, which sync no longer recreates. */
+  ignoredAccountCount: number
 }
 
 export type Rule = { id: string; pattern: string; priority: number; category: Category }
@@ -193,6 +195,8 @@ export const api = {
   renameConnection: (id: string, displayName: string) =>
     patch<Connection>(`/api/connections/${id}`, { displayName }),
   deleteConnection: (id: string) => del(`/api/connections/${id}`),
+  restoreIgnoredAccounts: (id: string) =>
+    post<{ restored: number }>(`/api/connections/${id}/ignored/restore`, {}),
   connectMonobank: (token: string) => post<{ id: string }>('/api/connections/monobank', { token }),
   setMonobankWebhook: (id: string, publicBaseUrl: string) =>
     post<{ webhookUrl: string }>(`/api/connections/${id}/monobank/webhook`, { publicBaseUrl }),

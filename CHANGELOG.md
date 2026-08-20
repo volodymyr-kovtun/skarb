@@ -91,6 +91,10 @@ All notable changes to Skarb are documented here. The format follows
 - Removing a bank connection now deletes the accounts it created and their transactions,
   instead of leaving orphaned accounts behind. Manually created accounts are untouched, and
   the confirmation says exactly how much is going.
+- Deleting a synced account makes it stay deleted. Sync rediscovers whatever the bank
+  reports, so a deleted account used to reappear on the next round with its history
+  re-fetched; the connection now remembers the provider-side id and skips it. Settings
+  shows how many accounts a connection is skipping, and can bring them back.
 - Background auto-sync every hour and on-demand "Sync now".
 - **A start date for the ledger** (`Sync:StartDate`, unset by default), for opening the books
   on a chosen day rather than on whatever window a bank happens to offer. Connectors stop

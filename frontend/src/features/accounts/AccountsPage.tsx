@@ -215,7 +215,13 @@ function AccountForm({ account, onClose, onSaved }:
   }
 
   const remove = async () => {
-    if (!confirm(`Delete "${account!.name}" and all its transactions? This cannot be undone.`)) return
+    // A synced account is rediscovered every sync, so deleting one also tells its connection
+    // to skip it from now on — say so, and say where that can be undone.
+    const warning = account!.connectionId
+      ? `Delete "${account!.name}" and all its transactions? It stops syncing and won't come ` +
+        `back on its own — Settings can bring it back later.`
+      : `Delete "${account!.name}" and all its transactions? This cannot be undone.`
+    if (!confirm(warning)) return
     await api.deleteAccount(account!.id)
     onSaved()
   }

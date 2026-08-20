@@ -249,6 +249,24 @@ function ConnectionRow({ c, onChanged }: { c: Connection; onChanged: () => void 
         </div>
       </div>
       {c.lastError && <p className="mt-3 rounded-row bg-danger/10 px-3.5 py-2.5 text-xs font-medium text-danger">{c.lastError}</p>}
+      {c.ignoredAccountCount > 0 && (
+        <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-row bg-surface px-3.5 py-2.5 text-xs text-muted">
+          <span>
+            {c.ignoredAccountCount === 1
+              ? '1 deleted account is kept out of sync.'
+              : `${c.ignoredAccountCount} deleted accounts are kept out of sync.`}
+          </span>
+          <button className="font-semibold text-ink underline underline-offset-2 hover:text-accent"
+            onClick={async () => {
+              const what = c.ignoredAccountCount === 1 ? 'it' : 'them'
+              if (!confirm(`Bring ${what} back? The next sync recreates ${what} and re-fetches history from scratch.`)) return
+              await api.restoreIgnoredAccounts(c.id)
+              onChanged()
+            }}>
+            Bring back
+          </button>
+        </p>
+      )}
       {webhookOpen && <WebhookModal connectionId={c.id} onClose={() => setWebhookOpen(false)} />}
       {renameOpen && (
         <RenameConnectionModal c={c} onClose={() => setRenameOpen(false)} onDone={() => { setRenameOpen(false); onChanged() }} />

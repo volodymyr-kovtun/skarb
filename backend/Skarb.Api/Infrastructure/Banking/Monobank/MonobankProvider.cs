@@ -61,11 +61,14 @@ public class MonobankProvider(
         var existing = await db.Accounts
             .Where(a => a.ConnectionId == connection.Id && a.ExternalId != null)
             .ToDictionaryAsync(a => a.ExternalId!, ct);
+        var ignored = connection.IgnoredExternalIds.ToHashSet();
         var accounts = new List<Account>();
 
         foreach (var acc in clientInfo.RootElement.GetProperty("accounts").EnumerateArray())
         {
             var externalId = acc.GetProperty("id").GetString()!;
+            // A card the owner deleted: skip it entirely, or this is where it would come back.
+            if (ignored.Contains(externalId)) continue;
             var currency = MonobankApiClient.Iso4217.GetValueOrDefault(acc.GetProperty("currencyCode").GetInt32(), "UAH");
             var creditLimit = acc.TryGetProperty("creditLimit", out var cl) ? FromMinor(cl.GetInt64()) : 0m;
             var type = acc.TryGetProperty("type", out var t) ? t.GetString() : "black";

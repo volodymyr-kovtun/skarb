@@ -9,7 +9,8 @@ namespace Skarb.Api.Features.Connections;
 
 public record ConnectionDto(
     Guid Id, string Provider, string DisplayName, string Status,
-    DateTime? LastSyncedAt, string? LastError, int AccountCount, DateTime? ConsentValidUntil);
+    DateTime? LastSyncedAt, string? LastError, int AccountCount, DateTime? ConsentValidUntil,
+    int IgnoredAccountCount);
 
 public record UpdateConnectionRequest(string DisplayName);
 public record MonobankConnectRequest(string Token);
@@ -58,6 +59,19 @@ public class ConnectionEndpoints : IEndpointGroup
             db.Connections.Remove(conn);
             await db.SaveChangesAsync();
             return Results.NoContent();
+        });
+
+        // Forgetting the deleted accounts is the only way back — the next sync rediscovers
+        // them from the bank, with their history re-fetched from scratch.
+        group.MapPost("/{id:guid}/ignored/restore", async (Guid id, SkarbDbContext db, ISyncService sync) =>
+        {
+            var conn = await db.Connections.FindAsync(id);
+            if (conn is null) return Results.NotFound();
+            var restored = conn.IgnoredExternalIds.Count;
+            conn.IgnoredExternalIds = [];
+            await db.SaveChangesAsync();
+            if (restored > 0) await sync.TriggerAsync(conn.Id);
+            return Results.Ok(new { restored });
         });
 
         // ---------- Monobank ----------
@@ -164,6 +178,6 @@ public class ConnectionEndpoints : IEndpointGroup
             ? EnableBankingSettings.From(conn).ValidUntil
             : null;
         return new ConnectionDto(conn.Id, conn.Provider, conn.DisplayName, conn.Status,
-            conn.LastSyncedAt, conn.LastError, accountCount, validUntil);
+            conn.LastSyncedAt, conn.LastError, accountCount, validUntil, conn.IgnoredExternalIds.Count);
     }
 }

@@ -61,6 +61,8 @@ public class EnableBankingProvider(
         foreach (var acc in doc.RootElement.GetProperty("accounts").EnumerateArray())
         {
             var uid = acc.GetProperty("uid").GetString()!;
+            // An account the owner deleted stays deleted, even across a re-authorization.
+            if (connection.IgnoredExternalIds.Contains(uid)) continue;
             var account = await db.Accounts.FirstOrDefaultAsync(
                 a => a.ConnectionId == connection.Id && a.ExternalId == uid, ct);
             var currency = acc.TryGetProperty("currency", out var cur) ? cur.GetString() ?? "PLN" : "PLN";

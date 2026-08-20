@@ -126,10 +126,17 @@ body {
   scrollbar-color: var(--sk-scrollbar) transparent;
 }
 
-/* Every focusable thing gets the same ring, in whichever theme is on. */
-:where(a, button, input, select, textarea, [tabindex]):focus-visible {
-  outline: 2px solid var(--sk-accent);
-  outline-offset: 2px;
+/*
+ * Every focusable thing gets the same ring, in whichever theme is on. It lives in the
+ * base layer so a component that draws its own focus treatment — the pill-shaped search
+ * fields, every `inputCls` input — can turn this one off with `outline-none`. Unlayered,
+ * it would outrank that utility whatever its specificity, and both rings would show.
+ */
+@layer base {
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--sk-accent);
+    outline-offset: 2px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

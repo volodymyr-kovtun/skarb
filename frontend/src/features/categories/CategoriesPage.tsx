@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import { api, refreshAll, type CategoryKind, type CategoryWithCount, type Tag } from '../../shared/api'
-import { CATEGORY_COLORS, Card, CardHeader, CategoryDot, ColorPicker, Modal, ModalActions, btnPrimary, errMsg, fieldLabelCls, inputCls } from '../../shared/ui'
+import { CATEGORY_COLORS, Card, CardHeader, CategoryDot, ColorPicker, Dot, Modal, ModalActions, btnGhost, btnPrimary, errMsg, fieldLabelCls, inputCls, quietLinkCls } from '../../shared/ui'
+import { useIsDark } from '../../shared/theme'
+import { swatch, tint } from '../../shared/color'
 
 const KIND_META: Record<CategoryKind, { title: string; blurb: string }> = {
   expense: { title: 'Spending', blurb: 'Day-to-day money out — counted as spending.' },
@@ -18,10 +20,10 @@ export default function CategoriesPage() {
   const refresh = () => refreshAll(qc)
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="px-1 pt-2">
-        <h1 className="font-display text-2xl font-bold tracking-tight">Categories</h1>
-        <p className="mt-1 text-sm text-muted">
+    <div className="flex flex-col gap-5">
+      <div>
+        <h1 className="font-display text-[30px] font-semibold tracking-[-0.02em]">Categories</h1>
+        <p className="mt-2 max-w-2xl text-[14.5px] leading-relaxed text-muted">
           How your money gets labeled. New bank transactions are categorized automatically by your rules and card codes.
         </p>
       </div>
@@ -29,38 +31,35 @@ export default function CategoriesPage() {
       {(['expense', 'investment', 'income'] as CategoryKind[]).map((kind) => {
         const items = (categories ?? []).filter((c) => c.kind === kind)
         return (
-          <Card key={kind} className="pb-4">
+          <Card key={kind} className="pb-7">
             <CardHeader
               title={KIND_META[kind].title}
               action={
-                <button
-                  onClick={() => setAdding(kind)}
-                  className="flex items-center gap-1 text-sm font-medium text-muted hover:text-ink"
-                >
-                  <Plus size={14} /> Add
+                <button onClick={() => setAdding(kind)} className={`${btnGhost} h-8 px-3.5 py-0 text-[13px]`}>
+                  <Plus size={15} /> Add
                 </button>
               }
             />
-            <p className="px-5 pb-2 text-xs text-faint">{KIND_META[kind].blurb}</p>
-            <div className="grid grid-cols-3 gap-2 px-5">
+            <p className="px-7 pb-4 text-[13px] text-faint">{KIND_META[kind].blurb}</p>
+            <div className="grid grid-cols-1 gap-3 px-7 sm:grid-cols-2 xl:grid-cols-4">
               {items.map((c) => (
                 <button
                   key={c.id}
                   onClick={() => setEditing(c)}
-                  className="flex items-center gap-2.5 rounded-xl border border-line px-3 py-2.5 text-left transition-colors hover:border-ink"
+                  className="flex items-center gap-3 rounded-row bg-surface2 px-3 py-2.5 text-left transition-colors hover:bg-hover"
                 >
                   <CategoryDot category={c} size="sm" />
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium">{c.name}</span>
-                    <span className="block text-xs text-faint">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13.5px] font-semibold">{c.name}</span>
+                    <span className="mt-px block text-[12px] text-faint">
                       {c.transactionCount === 0 ? 'unused' : `${c.transactionCount} transaction${c.transactionCount === 1 ? '' : 's'}`}
                     </span>
                   </span>
-                  <span className="ml-auto h-2 w-2 shrink-0 rounded-full" style={{ background: c.color }} />
+                  <Dot color={c.color} size={8} />
                 </button>
               ))}
               {items.length === 0 && (
-                <p className="col-span-3 py-4 text-center text-sm text-faint">No categories yet.</p>
+                <p className="py-4 text-center text-sm text-faint sm:col-span-2 xl:col-span-4">No categories yet.</p>
               )}
             </div>
           </Card>
@@ -96,32 +95,33 @@ export default function CategoriesPage() {
  * and the overview reports what each one costs.
  */
 function TagsCard() {
+  const dark = useIsDark()
   const { data: meta } = useQuery({ queryKey: ['meta'], queryFn: api.meta })
   const [editing, setEditing] = useState<Tag | null>(null)
   const [adding, setAdding] = useState(false)
   const tags = meta?.tags ?? []
 
   return (
-    <Card className="pb-4">
+    <Card className="pb-7">
       <CardHeader
         title="Tags"
         action={
-          <button onClick={() => setAdding(true)} className="flex items-center gap-1 text-sm font-medium text-muted hover:text-ink">
-            <Plus size={14} /> Add
+          <button onClick={() => setAdding(true)} className={`${btnGhost} h-8 px-3.5 py-0 text-[13px]`}>
+            <Plus size={15} /> Add
           </button>
         }
       />
-      <p className="px-5 pb-3 text-xs text-faint">
+      <p className="max-w-3xl px-7 pb-4 text-[13px] leading-relaxed text-faint">
         Free-form labels, finer than a category and stackable — #vacation, #renovation. Attach them
         in the transaction editor; the overview reports what each one costs this month.
       </p>
-      <div className="flex flex-wrap gap-2 px-5">
+      <div className="flex flex-wrap gap-2.5 px-7">
         {tags.map((t) => (
           <button
             key={t.id}
             onClick={() => setEditing(t)}
-            className="rounded-full px-3 py-1.5 text-sm font-medium transition-transform hover:scale-105"
-            style={{ background: t.color + '1f', color: t.color }}
+            className="rounded-full px-4 py-2 text-[13.5px] font-semibold transition-transform hover:scale-105"
+            style={{ background: tint(t.color, dark), color: swatch(t.color, dark) }}
           >
             #{t.name}
           </button>
@@ -208,39 +208,39 @@ function RulesCard() {
   }
 
   return (
-    <Card className="pb-4">
+    <Card className="pb-7">
       <CardHeader
         title="Auto-categorization rules"
         action={
-          <button onClick={applyNow} className="text-sm font-medium text-muted hover:text-ink">
+          <button onClick={applyNow} className={quietLinkCls}>
             Apply to uncategorized
           </button>
         }
       />
-      <div className="px-5 pt-1">
-        <p className="mb-3 text-sm text-muted">
+      <div className="px-7 pt-1">
+        <p className="mb-4 max-w-3xl text-[14px] leading-relaxed text-muted">
           When a new transaction's description contains a keyword, it gets the category automatically —
-          e.g. <code className="rounded bg-paper px-1">ibkr</code> → 📈 Brokerage counts as investing.
+          e.g. <code className="rounded-md bg-surface2 px-2 py-0.5 text-[12.5px]">ibkr</code> → 📈 Brokerage counts as investing.
           Rules apply to new transactions as they arrive; use <em>Apply to uncategorized</em> to run them
           over existing ones (it never overrides a category you set by hand).
         </p>
-        {applyMsg && <p className="mb-3 rounded-lg bg-income/5 px-3 py-2 text-sm text-income">{applyMsg}</p>}
-        <div className="flex gap-2">
-          <input className={inputCls} placeholder='Keyword, e.g. "zabka"' value={pattern} onChange={(e) => setPattern(e.target.value)} />
-          <select className={inputCls + ' w-56'} value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+        {applyMsg && <p className="mb-4 rounded-row bg-income/10 px-4 py-2.5 text-sm font-medium text-income">{applyMsg}</p>}
+        <div className="flex flex-wrap gap-2.5">
+          <input className={`${inputCls} min-w-[12rem] flex-1`} placeholder='Keyword, e.g. "zabka"' value={pattern} onChange={(e) => setPattern(e.target.value)} />
+          <select className={inputCls + ' w-56 shrink-0'} value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
             <option value="">Pick category…</option>
             {(meta?.categories ?? []).map((c) => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
           </select>
           <button className={btnPrimary} onClick={add} disabled={!pattern.trim() || !categoryId}>Add</button>
         </div>
         {(rules ?? []).length > 0 && (
-          <ul className="mt-3 flex flex-col">
+          <ul className="mt-4 flex flex-col">
             {rules!.map((r) => (
-              <li key={r.id} className="flex items-center gap-2 border-b border-line py-2 text-sm last:border-0">
-                <code className="rounded-md bg-paper px-2 py-0.5 text-xs">{r.pattern}</code>
+              <li key={r.id} className="flex items-center gap-3 border-b border-line py-2.5 text-[13.5px] last:border-0">
+                <code className="rounded-md bg-surface2 px-2.5 py-1 text-[12.5px]">{r.pattern}</code>
                 <span className="text-faint">→</span>
                 <span>{r.category.emoji} {r.category.name}</span>
-                <button className="ml-auto text-xs text-faint hover:text-danger"
+                <button className="ml-auto text-[12.5px] font-semibold text-faint transition-colors hover:text-danger"
                   onClick={async () => { await api.deleteRule(r.id); qc.invalidateQueries({ queryKey: ['rules'] }) }}>
                   remove
                 </button>

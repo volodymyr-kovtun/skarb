@@ -17,9 +17,9 @@ export function SecuritySettings() {
   const remaining = recovery?.remaining ?? 0
 
   return (
-    <Card className="pb-4">
+    <Card className="pb-7">
       <CardHeader title="Security" />
-      <div className="flex flex-col gap-3 px-5 pt-2">
+      <div className="flex flex-col px-7 pt-1">
         <Row label="Signed in as" value={session?.email ?? '—'} />
 
         <Row
@@ -40,15 +40,15 @@ export function SecuritySettings() {
             </span>
           }
           action={
-            <button className="text-xs font-medium text-muted hover:text-ink" onClick={() => setCodesOpen(true)}>
+            <button className="text-xs font-semibold text-muted transition-colors hover:text-ink" onClick={() => setCodesOpen(true)}>
               Regenerate
             </button>
           }
         />
 
-        <div className="mt-1">
-          <button className={`${btnGhost} flex items-center gap-2`} onClick={() => setPasswordOpen(true)}>
-            <KeyRound size={14} />
+        <div className="mt-5">
+          <button className={btnGhost} onClick={() => setPasswordOpen(true)}>
+            <KeyRound size={15} />
             Change password
           </button>
         </div>
@@ -62,7 +62,7 @@ export function SecuritySettings() {
 
 function Row({ label, value, action }: { label: string; value: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-3 border-b border-line pb-3 text-sm last:border-0 last:pb-0">
+    <div className="flex items-center gap-4 border-b border-line py-3.5 text-[13.5px] last:border-0">
       <span className="text-muted">{label}</span>
       <span className="ml-auto truncate">{value}</span>
       {action}

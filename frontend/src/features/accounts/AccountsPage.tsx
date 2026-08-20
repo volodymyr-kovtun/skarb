@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Landmark } from 'lucide-react'
 import { api, fmtMoney, refreshAll, type Account } from '../../shared/api'
-import { ACCOUNT_COLORS, Card, ColorPicker, Modal, ModalActions, bankLabel, btnPrimary, errMsg, fieldLabelCls, inputCls, labelCls } from '../../shared/ui'
+import { ACCOUNT_COLORS, Card, ColorPicker, Dot, Modal, ModalActions, bankLabel, btnPrimary, errMsg, fieldLabelCls, inputCls, sectionTitleCls } from '../../shared/ui'
 
 const providerLabel: Record<string, string> = {
   manual: 'Manual',
@@ -43,18 +43,18 @@ export default function AccountsPage() {
   const archived = accounts.filter((a) => a.isArchived)
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between px-1 pt-2">
-        <h1 className="font-display text-2xl font-bold tracking-tight">Accounts</h1>
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="font-display text-[30px] font-semibold tracking-[-0.02em]">Accounts</h1>
         <button className={btnPrimary} onClick={() => setAdding(true)}>
-          <Plus size={15} className="mr-1 inline -translate-y-px" />
+          <Plus size={16} />
           Add manual account
         </button>
       </div>
 
       {active.length === 0 && (
-        <Card className="px-6 py-12 text-center">
-          <Landmark className="mx-auto mb-3 text-faint" size={28} />
+        <Card className="px-6 py-16 text-center">
+          <Landmark className="mx-auto mb-4 text-faint" size={30} />
           <p className="text-sm text-muted">
             No accounts yet. Connect a bank in Settings, or add a manual account to track cash.
           </p>
@@ -62,39 +62,39 @@ export default function AccountsPage() {
       )}
 
       {active.length > 0 && (
-        <Card className="pb-3">
+        <Card className="px-4 pb-5 pt-2">
           {groupByBank(active).map((g, i) => {
             const providers = [...new Set(g.accounts.map((a) => a.provider))]
             const sum = singleCurrencyTotal(g.accounts)
             return (
-              <div key={g.label} className={i > 0 ? 'mt-1 border-t border-line' : ''}>
-                <header className="flex items-baseline gap-2.5 px-5 pt-4 pb-1">
-                  <h2 className={labelCls}>{g.label}</h2>
-                  <span className="text-xs text-faint">
+              <div key={g.label} className={i > 0 ? 'mt-4 border-t border-line pt-4' : 'pt-3'}>
+                <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-3 pb-2">
+                  <h2 className={sectionTitleCls}>{g.label}</h2>
+                  <span className="text-[12.5px] text-faint">
                     {g.accounts.length} account{g.accounts.length === 1 ? '' : 's'}
                     {providers.length === 1 && ` · ${providerLabel[providers[0]] ?? providers[0]}`}
                   </span>
                   {sum && (
-                    <span className="tnum ml-auto text-sm font-semibold">{fmtMoney(sum.total, sum.currency)}</span>
+                    <span className="tnum ml-auto text-[15px] font-semibold">{fmtMoney(sum.total, sum.currency)}</span>
                   )}
                 </header>
-                <div className="px-2">
+                <div>
                   {g.accounts.map((a) => (
                     <button
                       key={a.id}
                       onClick={() => setEditing(a)}
-                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-paper"
+                      className="flex w-full items-center gap-3.5 rounded-row px-3 py-3 text-left transition-colors hover:bg-hover"
                     >
-                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: a.color }} />
+                      <Dot color={a.color} />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">{a.name}</span>
-                        <span className="block truncate text-xs text-faint">
+                        <span className="block truncate text-[14.5px] font-semibold">{a.name}</span>
+                        <span className="mt-0.5 block truncate text-[12.5px] text-faint">
                           {a.currency}
                           {a.maskedPan ? ` · ${a.maskedPan.slice(-8)}` : a.iban ? ` · …${a.iban.slice(-6)}` : ''}
                           {providers.length > 1 && ` · ${providerLabel[a.provider] ?? a.provider}`}
                         </span>
                       </span>
-                      <span className="tnum text-sm font-semibold">{fmtMoney(a.balance, a.currency)}</span>
+                      <span className="tnum text-[14.5px] font-semibold">{fmtMoney(a.balance, a.currency)}</span>
                     </button>
                   ))}
                 </div>
@@ -105,13 +105,13 @@ export default function AccountsPage() {
       )}
 
       {archived.length > 0 && (
-        <details className="px-1 text-sm text-muted">
-          <summary className="cursor-pointer font-medium">Archived ({archived.length})</summary>
-          <div className="mt-2 flex flex-col gap-1">
+        <details className="px-2 text-sm text-muted">
+          <summary className="cursor-pointer font-semibold marker:text-faint">Archived ({archived.length})</summary>
+          <div className="mt-3 flex flex-col gap-1">
             {archived.map((a) => (
               <button key={a.id} onClick={() => setEditing(a)}
-                className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-surface">
-                <span className="h-2 w-2 rounded-full" style={{ background: a.color }} />
+                className="flex items-center gap-3 rounded-row px-3 py-2.5 text-left transition-colors hover:bg-hover">
+                <Dot color={a.color} size={8} />
                 <span className="truncate">{bankLabel(a)} · {a.name}</span>
                 <span className="tnum ml-auto">{fmtMoney(a.balance, a.currency)}</span>
               </button>
@@ -198,7 +198,7 @@ function AccountForm({ account, onClose, onSaved }:
 
         {isEdit && (
           <label className="flex items-center gap-2 text-sm text-muted">
-            <input type="checkbox" checked={archived} onChange={(e) => setArchived(e.target.checked)} className="h-4 w-4 accent-ink" />
+            <input type="checkbox" checked={archived} onChange={(e) => setArchived(e.target.checked)} className="h-4 w-4 accent-[var(--sk-accent)]" />
             Archive (hide from overview and stop syncing)
           </label>
         )}

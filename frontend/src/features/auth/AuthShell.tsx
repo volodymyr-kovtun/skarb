@@ -14,31 +14,28 @@ export function AuthShell({ title, subtitle, children, footer, wide = false }: {
   return (
     <div className="flex min-h-screen items-center justify-center bg-paper px-6 py-12">
       <div className={`w-full ${wide ? 'max-w-md' : 'max-w-sm'}`}>
-        <header className="mb-7 flex flex-col items-center gap-3">
+        <header className="mb-8 flex flex-col items-center gap-4">
           <Mark />
           <div className="text-center">
-            <h1 className="font-display text-2xl font-bold tracking-tight">{title}</h1>
-            {subtitle && <p className="mt-1.5 text-sm leading-relaxed text-muted">{subtitle}</p>}
+            <h1 className="font-display text-[28px] font-semibold tracking-[-0.02em]">{title}</h1>
+            {subtitle && <p className="mt-2 text-sm leading-relaxed text-muted">{subtitle}</p>}
           </div>
         </header>
 
-        <div className="rounded-2xl border border-line bg-surface p-6 shadow-card">{children}</div>
+        <div className="rounded-card bg-surface p-7 shadow-card">{children}</div>
 
-        {footer && <div className="mt-4 text-center text-xs leading-relaxed text-faint">{footer}</div>}
+        {footer && <div className="mt-5 text-center text-xs leading-relaxed text-faint">{footer}</div>}
       </div>
     </div>
   )
 }
 
 export function Mark({ size = 'lg' }: { size?: 'sm' | 'lg' }) {
-  const box = size === 'lg' ? 'h-11 w-11' : 'h-7 w-7'
-  const text = size === 'lg' ? 'text-lg' : 'text-sm'
+  const box = size === 'lg' ? 'h-12 w-12' : 'h-8 w-8'
+  const text = size === 'lg' ? 'text-xl' : 'text-[15px]'
   return (
-    <span
-      className={`flex ${box} items-center justify-center rounded-full bg-gold shadow-[inset_0_0_0_2px_rgba(19,27,46,0.9)]`}
-      aria-hidden
-    >
-      <span className={`font-display ${text} font-bold text-ink`}>S</span>
+    <span className={`flex ${box} items-center justify-center rounded-full bg-accent`} aria-hidden>
+      <span className={`font-display ${text} font-bold text-paper`}>S</span>
     </span>
   )
 }
@@ -46,7 +43,7 @@ export function Mark({ size = 'lg' }: { size?: 'sm' | 'lg' }) {
 /** Inline error, sized to sit under a field without shifting the card around. */
 export function FormError({ children }: { children: ReactNode }) {
   return (
-    <p role="alert" className="rounded-xl bg-danger/5 px-3 py-2 text-sm leading-snug text-danger">
+    <p role="alert" className="rounded-row bg-danger/10 px-3.5 py-2.5 text-sm font-medium leading-snug text-danger">
       {children}
     </p>
   )
@@ -54,5 +51,5 @@ export function FormError({ children }: { children: ReactNode }) {
 
 /** A 6-digit authenticator code. Wide tracking makes a mistyped digit obvious at a glance. */
 export const codeInputCls =
-  'w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-center text-lg font-semibold tracking-[0.35em] ' +
-  'tnum outline-none transition-colors focus:border-ink placeholder:font-normal placeholder:tracking-normal placeholder:text-faint'
+  'w-full rounded-row bg-surface2 px-3 py-3 text-center text-lg font-semibold tracking-[0.35em] tnum outline-none ' +
+  'transition-shadow focus:shadow-[inset_0_0_0_1.5px_var(--sk-accent)] placeholder:font-normal placeholder:tracking-normal placeholder:text-faint'

@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { fmtMoney, type Account } from '../../shared/api'
-import { Card, CardHeader, bankLabel } from '../../shared/ui'
+import { Card, CardHeader, bankLabel, quietLinkCls } from '../../shared/ui'
+import { useIsDark } from '../../shared/theme'
+import { swatch, tint } from '../../shared/color'
 
 export type AccountRow = { account: Account; balanceConverted: number }
 type Group = { label: string; color: string; total: number; rows: AccountRow[] }
@@ -13,33 +15,22 @@ type Group = { label: string; color: string; total: number; rows: AccountRow[] }
  */
 export default function AccountsCard({ rows, currency }: { rows: AccountRow[]; currency: string }) {
   const [open, setOpen] = useState<string | null>(null)
+  const dark = useIsDark()
   if (rows.length === 0) return null
 
   const groups = groupByBank(rows)
-  // Only what you own gets a share of the bar — an account in the red takes no width.
+  // Only what you own gets a share of the total — an account in the red takes no width.
   const positive = groups.reduce((sum, g) => sum + Math.max(g.total, 0), 0)
   const share = (total: number) => (positive > 0 ? Math.max(total, 0) / positive : 0)
 
   return (
-    <Card className="pb-2">
+    <Card className="h-full pb-5">
       <CardHeader
         title="Accounts"
-        action={<Link to="/accounts" className="text-sm font-medium text-muted hover:text-ink">Manage</Link>}
+        action={<Link to="/accounts" className={quietLinkCls}>Manage</Link>}
       />
 
-      {positive > 0 && (
-        <div className="flex gap-[3px] px-5 pt-1 pb-3" aria-hidden>
-          {groups.filter((g) => g.total > 0).map((g) => (
-            <span
-              key={g.label}
-              className="h-1.5 rounded-full"
-              style={{ background: g.color, flexGrow: share(g.total), flexBasis: 6, minWidth: 6 }}
-            />
-          ))}
-        </div>
-      )}
-
-      <div className="px-2 pb-1">
+      <div className="px-4">
         {groups.map((g) => {
           const expanded = open === g.label
           const single = g.rows.length === 1
@@ -48,39 +39,47 @@ export default function AccountsCard({ rows, currency }: { rows: AccountRow[]; c
               <button
                 onClick={() => setOpen(expanded ? null : g.label)}
                 aria-expanded={expanded}
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-paper"
+                className="flex w-full items-center gap-3.5 rounded-row px-3 py-3 text-left transition-colors hover:bg-hover"
               >
-                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: g.color }} />
+                <span
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-tile text-[13px] font-bold"
+                  style={{ background: tint(g.color, dark), color: swatch(g.color, dark) }}
+                  aria-hidden
+                >
+                  {initials(g.label)}
+                </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">{g.label}</span>
-                  <span className="block text-xs text-faint">
+                  <span className="block truncate text-[14.5px] font-semibold">{g.label}</span>
+                  <span className="mt-0.5 block truncate text-[12.5px] text-faint">
                     {single
                       ? `${g.rows[0].account.name} · ${g.rows[0].account.currency}`
                       : `${g.rows.length} accounts · ${[...new Set(g.rows.map((r) => r.account.currency))].join(' · ')}`}
                   </span>
                 </span>
-                <span className="tnum text-sm font-semibold">{fmtMoney(g.total, currency)}</span>
-                <span className="tnum w-9 shrink-0 text-right text-xs text-faint">
-                  {positive > 0 ? sharePct(share(g.total)) : ''}
+                <span className="shrink-0 text-right">
+                  <span className="tnum block text-[14.5px] font-semibold">{fmtMoney(g.total, currency)}</span>
+                  <span className="tnum mt-0.5 block text-[12px] text-faint">
+                    {positive > 0 ? `${sharePct(share(g.total))} of net worth` : ''}
+                  </span>
                 </span>
                 <ChevronRight
-                  size={15}
+                  size={16}
                   className={`shrink-0 text-faint transition-transform ${expanded ? 'rotate-90' : ''}`}
                 />
               </button>
 
               {expanded && (
-                <ul className="mb-1 ml-[26px] flex flex-col gap-px border-l border-line pl-3">
+                <ul className="mb-2 ml-[30px] flex flex-col gap-px border-l border-line pl-4">
                   {g.rows.map(({ account, balanceConverted }) => (
-                    <li key={account.id} className="flex items-center gap-3 py-1.5 pr-3 text-sm">
+                    <li key={account.id} className="flex items-center gap-3 py-2 pr-3 text-[13.5px]">
                       <span className="min-w-0 flex-1 truncate text-muted">
                         {account.name}
                         {account.maskedPan
                           ? ` · ${account.maskedPan.slice(-4)}`
                           : account.iban ? ` · …${account.iban.slice(-4)}` : ''}
                       </span>
-                      <span className="tnum shrink-0 font-medium">{fmtMoney(account.balance, account.currency)}</span>
-                      <span className="tnum w-28 shrink-0 whitespace-nowrap text-right text-xs text-faint">
+                      <span className="tnum shrink-0 font-semibold">{fmtMoney(account.balance, account.currency)}</span>
+                      <span className="tnum w-28 shrink-0 whitespace-nowrap text-right text-[12px] text-faint">
                         {account.currency === currency ? '' : `≈ ${fmtMoney(balanceConverted, currency)}`}
                       </span>
                     </li>
@@ -93,6 +92,12 @@ export default function AccountsCard({ rows, currency }: { rows: AccountRow[]; c
       </div>
     </Card>
   )
+}
+
+/** Two letters is enough to tell PKO BP from Monobank at a glance. */
+function initials(label: string) {
+  const words = label.trim().split(/\s+/)
+  return (words.length > 1 ? words[0][0] + words[1][0] : label.slice(0, 2)).toUpperCase()
 }
 
 /** A holding that exists shouldn't read as 0% — small shares round up to "<1%". */

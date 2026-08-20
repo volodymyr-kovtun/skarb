@@ -2,12 +2,23 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='42' fill='%23C29B3C'/><circle cx='50' cy='50' r='30' fill='none' stroke='%23131B2E' stroke-width='5'/><text x='50' y='63' font-size='38' text-anchor='middle' fill='%23131B2E' font-family='Georgia'>S</text></svg>" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='%23AF5229'/><text x='50' y='69' font-size='58' font-weight='700' text-anchor='middle' fill='%23F2EFE9' font-family='Georgia,serif'>S</text></svg>" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
     <title>Skarb — personal finance</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script>
+      // Paint the right theme before first paint — otherwise a dark-mode user gets a white flash.
+      (function () {
+        try {
+          var saved = localStorage.getItem('skarb.theme')
+          var dark = saved === 'dark' || (saved !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+        } catch (e) { document.documentElement.dataset.theme = 'light' }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -37,23 +37,23 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="px-1 pt-2">
-        <h1 className="font-display text-2xl font-bold tracking-tight">Settings</h1>
-        <p className="mt-1 text-sm text-muted">Bank connections, imports and automation.</p>
+      <div>
+        <h1 className="font-display text-[30px] font-semibold tracking-[-0.02em]">Settings</h1>
+        <p className="mt-2 text-[14.5px] text-muted">Bank connections, imports and automation.</p>
       </div>
 
       {banner && (
-        <div className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-sm ${banner.ok ? 'border-income/30 bg-income/5 text-income' : 'border-danger/30 bg-danger/5 text-danger'}`}>
+        <div className={`flex items-center gap-2.5 rounded-row px-4 py-3.5 text-sm font-medium ${banner.ok ? 'bg-income/10 text-income' : 'bg-danger/10 text-danger'}`}>
           {banner.ok ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
           {banner.text}
-          <button className="ml-auto text-xs underline" onClick={() => setBanner(null)}>dismiss</button>
+          <button className="ml-auto text-xs font-semibold underline" onClick={() => setBanner(null)}>dismiss</button>
         </div>
       )}
 
       {/* Connections */}
-      <Card className="pb-4">
+      <Card className="pb-7">
         <CardHeader title="Bank connections" />
-        <div className="flex flex-col gap-3 px-5 pt-2">
+        <div className="flex flex-col gap-3 px-7 pt-1">
           {(connections ?? []).length === 0 && (
             <p className="text-sm text-muted">
               Nothing connected yet. Link Monobank with a personal token, or any of 2,500+ European banks
@@ -63,35 +63,35 @@ export default function SettingsPage() {
           {(connections ?? []).map((c) => (
             <ConnectionRow key={c.id} c={c} onChanged={refresh} />
           ))}
-          <div className="mt-1 flex gap-2">
+          <div className="mt-2 flex flex-wrap gap-2.5">
             <button className={btnPrimary} onClick={() => setMonoOpen(true)}>
-              <Plug size={14} className="mr-1.5 inline -translate-y-px" />Connect Monobank
+              <Plug size={16} />Connect Monobank
             </button>
             <button className={btnPrimary} onClick={() => setEbOpen(true)}>
-              <Landmark size={14} className="mr-1.5 inline -translate-y-px" />Connect a bank
+              <Landmark size={16} />Connect a bank
             </button>
             <button className={btnGhost} onClick={() => setCsvOpen(true)}>
-              <Upload size={14} className="mr-1.5 inline -translate-y-px" />Import CSV (ZEN, …)
+              <Upload size={16} />Import CSV (ZEN, …)
             </button>
           </div>
         </div>
       </Card>
 
       {/* Sync activity */}
-      <Card className="pb-3">
+      <Card className="pb-6">
         <CardHeader title="Sync activity" />
-        <div className="px-5 pt-1">
+        <div className="px-7 pt-1">
           {(status?.logs ?? []).length === 0 ? (
             <p className="pb-3 text-sm text-faint">No syncs yet.</p>
           ) : (
             <ul className="flex flex-col">
               {status!.logs.map((l, i) => (
-                <li key={i} className="flex items-start gap-2 border-b border-line py-2 text-sm last:border-0">
+                <li key={i} className="flex items-start gap-3 border-b border-line py-3 text-[13.5px] last:border-0">
                   {l.success
-                    ? <CheckCircle2 size={15} className="mt-0.5 shrink-0 text-income" />
-                    : <AlertCircle size={15} className="mt-0.5 shrink-0 text-danger" />}
+                    ? <CheckCircle2 size={16} className="mt-px shrink-0 text-income" />
+                    : <AlertCircle size={16} className="mt-px shrink-0 text-danger" />}
                   <span className="text-muted">{l.message}</span>
-                  <span className="ml-auto shrink-0 text-xs text-faint">
+                  <span className="ml-auto shrink-0 text-[12.5px] text-faint">
                     {formatDistanceToNow(parseISO(l.at), { addSuffix: true })}
                   </span>
                 </li>
@@ -113,42 +113,42 @@ export default function SettingsPage() {
 function ConnectionRow({ c, onChanged }: { c: Connection; onChanged: () => void }) {
   const [webhookOpen, setWebhookOpen] = useState(false)
   const statusChip =
-    c.status === 'linked' ? 'bg-income/10 text-income' :
-    c.status === 'error' ? 'bg-danger/10 text-danger' : 'bg-paper text-muted'
+    c.status === 'linked' ? 'bg-income/15 text-income' :
+    c.status === 'error' ? 'bg-danger/15 text-danger' : 'bg-surface text-muted'
 
   return (
-    <div className="rounded-xl border border-line px-4 py-3">
-      <div className="flex items-center gap-3">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-ink font-display text-sm font-bold text-white">
+    <div className="rounded-row bg-surface2 px-4 py-4">
+      <div className="flex flex-wrap items-center gap-3.5">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-tile bg-accent font-display text-base font-bold text-paper">
           {c.displayName.slice(0, 1)}
         </span>
         <div className="min-w-0">
-          <p className="text-sm font-semibold">
+          <p className="flex items-center gap-2.5 text-[14.5px] font-semibold">
             {c.displayName}
-            <span className={`ml-2 rounded-md px-1.5 py-0.5 text-[11px] font-medium ${statusChip}`}>{c.status}</span>
+            <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${statusChip}`}>{c.status}</span>
           </p>
-          <p className="text-xs text-faint">
+          <p className="mt-0.5 text-[12.5px] text-faint">
             {c.accountCount} account{c.accountCount === 1 ? '' : 's'}
             {c.lastSyncedAt && ` · synced ${formatDistanceToNow(parseISO(c.lastSyncedAt), { addSuffix: true })}`}
             {c.consentValidUntil && ` · consent until ${parseISO(c.consentValidUntil).toLocaleDateString()}`}
           </p>
         </div>
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-0.5">
           {c.provider === 'monobank' && (
-            <button title="Instant sync (webhook)" className="rounded-lg p-2 text-muted hover:bg-paper hover:text-ink" onClick={() => setWebhookOpen(true)}>
+            <button title="Instant sync (webhook)" className="rounded-full p-2.5 text-muted transition-colors hover:bg-hover hover:text-ink" onClick={() => setWebhookOpen(true)}>
               <Webhook size={16} />
             </button>
           )}
-          <button title="Sync now" className="rounded-lg p-2 text-muted hover:bg-paper hover:text-ink"
+          <button title="Sync now" className="rounded-full p-2.5 text-muted transition-colors hover:bg-hover hover:text-ink"
             onClick={async () => { await api.syncOne(c.id); onChanged() }}>
             <RefreshCw size={16} />
           </button>
           <button title="Full re-sync: re-fetch the whole history and refresh existing transactions"
-            className="rounded-lg p-2 text-muted hover:bg-paper hover:text-ink"
+            className="rounded-full p-2.5 text-muted transition-colors hover:bg-hover hover:text-ink"
             onClick={async () => { await api.syncOne(c.id, true); onChanged() }}>
             <History size={16} />
           </button>
-          <button title="Remove connection" className="rounded-lg p-2 text-muted hover:bg-paper hover:text-danger"
+          <button title="Remove connection" className="rounded-full p-2.5 text-muted transition-colors hover:bg-hover hover:text-danger"
             onClick={async () => {
               if (confirm(`Remove ${c.displayName}? Accounts and transactions are kept.`)) {
                 await api.deleteConnection(c.id)
@@ -159,7 +159,7 @@ function ConnectionRow({ c, onChanged }: { c: Connection; onChanged: () => void 
           </button>
         </div>
       </div>
-      {c.lastError && <p className="mt-2 rounded-lg bg-danger/5 px-3 py-2 text-xs text-danger">{c.lastError}</p>}
+      {c.lastError && <p className="mt-3 rounded-row bg-danger/10 px-3.5 py-2.5 text-xs font-medium text-danger">{c.lastError}</p>}
       {webhookOpen && <WebhookModal connectionId={c.id} onClose={() => setWebhookOpen(false)} />}
     </div>
   )
@@ -196,7 +196,7 @@ function MonobankModal({ onClose, onDone }: { onClose: () => void; onDone: () =>
         First sync fetches the last 31 days and can take a few minutes (Monobank allows one request per minute).
       </p>
       {error && <p className="mt-2 text-sm text-danger">{error}</p>}
-      <div className="mt-4 flex justify-end gap-2">
+      <div className="mt-5 flex justify-end gap-2">
         <button className={btnGhost} onClick={onClose}>Cancel</button>
         <button className={btnPrimary} onClick={connect} disabled={busy || !token.trim()}>
           {busy ? 'Connecting…' : 'Connect & sync'}
@@ -229,9 +229,9 @@ function WebhookModal({ connectionId, onClose }: { connectionId: string; onClose
         <span className="font-medium text-ink">Tailscale Funnel</span> works well (see docs/BANKS.md).
       </p>
       <input className={inputCls + ' mt-3'} placeholder="https://skarb.example.com" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
-      {result && <p className="mt-2 break-all rounded-lg bg-income/5 px-3 py-2 text-xs text-income">Webhook registered: {result}</p>}
+      {result && <p className="mt-2 break-all rounded-row bg-income/10 px-3 py-2 text-xs text-income">Webhook registered: {result}</p>}
       {error && <p className="mt-2 text-sm text-danger">{error}</p>}
-      <div className="mt-4 flex justify-end gap-2">
+      <div className="mt-5 flex justify-end gap-2">
         <button className={btnGhost} onClick={onClose}>Close</button>
         <button className={btnPrimary} onClick={enable} disabled={!baseUrl.startsWith('https://')}>Enable</button>
       </div>
@@ -339,12 +339,12 @@ function EnableBankingModal({ onClose }: { onClose: () => void }) {
           <div className="max-h-72 overflow-y-auto rounded-xl border border-line">
             {shown.slice(0, 200).map((b) => (
               <button key={`${b.country}:${b.name}`} disabled={busy}
-                className="flex w-full items-center gap-2 border-b border-line px-4 py-2.5 text-left text-sm last:border-0 hover:bg-paper"
+                className="flex w-full items-center gap-2 border-b border-line px-4 py-2.5 text-left text-sm last:border-0 hover:bg-surface2"
                 onClick={() => authorize(b.name, b.country)}>
                 <Landmark size={15} className="shrink-0 text-faint" />
                 <span className="truncate">{b.name}</span>
                 <span className="ml-auto flex shrink-0 items-center gap-2 text-xs text-faint">
-                  <span className="rounded bg-paper px-1.5 py-0.5 font-medium">{b.country}</span>
+                  <span className="rounded bg-surface2 px-1.5 py-0.5 font-medium">{b.country}</span>
                   authorize →
                 </span>
               </button>
@@ -356,7 +356,7 @@ function EnableBankingModal({ onClose }: { onClose: () => void }) {
           </div>
           <p className="text-xs text-faint">
             You will be redirected to the bank to approve read-only access (valid ~90 days), then brought back to{' '}
-            <code className="rounded bg-paper px-1">{window.location.origin}/settings</code> — this exact URL must be in
+            <code className="rounded bg-surface2 px-1">{window.location.origin}/settings</code> — this exact URL must be in
             your Enable Banking app's allowed redirect URLs.
           </p>
           {error && <p className="text-sm text-danger">{error}</p>}
@@ -447,7 +447,7 @@ function CsvModal({ meta, onClose, onDone }: { meta: Meta; onClose: () => void; 
             </select>
           </label>
         </div>
-        <p className="rounded-lg bg-paper px-3 py-2 text-xs text-muted">{cfg.hint}</p>
+        <p className="rounded-lg bg-surface2 px-3 py-2 text-xs text-muted">{cfg.hint}</p>
 
         <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-line px-4 py-6 text-sm text-muted transition-colors hover:border-ink hover:text-ink">
           <Upload size={16} />

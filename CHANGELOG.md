@@ -87,7 +87,11 @@ All notable changes to Skarb are documented here. The format follows
 - Bank sync: Monobank (personal API + optional instant webhook), Enable Banking (PKO BP
   and 2,500+ European banks), CSV import with ZEN / PKO presets.
 - Bank connections can be renamed from Settings. The accounts synced through a connection
-  are grouped under its name, so the rename relabels them too.
+  are grouped under its name, so the rename relabels them too — all of them, including any
+  whose label had drifted from the connection's.
+- Monobank accounts are grouped under their connection's name rather than a fixed
+  "Monobank", and follow it on every sync. A card the bank started reporting after a rename
+  used to arrive under the old name and sit in a group of its own.
 - Removing a bank connection now deletes the accounts it created and their transactions,
   instead of leaving orphaned accounts behind. Manually created accounts are untouched, and
   the confirmation says exactly how much is going.

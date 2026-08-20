@@ -40,9 +40,11 @@ public class ConnectionEndpoints : IEndpointGroup
             var name = req.DisplayName?.Trim();
             if (string.IsNullOrWhiteSpace(name))
                 return Results.BadRequest(new { error = "Name is required" });
-            // The institution shown on an account is this name, copied when the account was
-            // discovered — carry the rename over so grouping by bank follows it everywhere.
-            foreach (var account in conn.Accounts.Where(a => a.Bank == conn.DisplayName))
+            // The institution shown on an account is this name, so carry the rename over and
+            // grouping by bank follows it everywhere. Every account goes, not just the ones
+            // still matching the old name — one whose label had drifted would otherwise be
+            // stranded, skipped by this rename and by every rename after it.
+            foreach (var account in conn.Accounts)
                 account.Bank = name;
             conn.DisplayName = name;
             await db.SaveChangesAsync();

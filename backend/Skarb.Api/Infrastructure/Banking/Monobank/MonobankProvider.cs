@@ -78,7 +78,7 @@ public class MonobankProvider(
                 account = new Account
                 {
                     Name = $"Monobank {type} ({currency})",
-                    Bank = "Monobank",
+                    Bank = connection.DisplayName,
                     Provider = ProviderNames.Monobank,
                     ConnectionId = connection.Id,
                     ExternalId = externalId,
@@ -89,6 +89,10 @@ public class MonobankProvider(
             }
 
             account.Currency = currency;
+            // The institution an account is grouped under is the connection's name. Refreshing
+            // it here catches a card that appeared after a rename, which would otherwise sit in
+            // a group of its own forever.
+            account.Bank = connection.DisplayName;
             account.Balance = OwnFunds(acc.GetProperty("balance").GetInt64(), creditLimit);
             account.CreditLimit = creditLimit;
             account.MaskedPan = acc.TryGetProperty("maskedPan", out var mp) && mp.GetArrayLength() > 0

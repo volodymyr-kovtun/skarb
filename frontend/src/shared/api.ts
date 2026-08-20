@@ -57,7 +57,7 @@ export type SyncStatus = {
   logs: { at: string; provider: string; message: string; success: boolean; newTransactions: number }[]
 }
 
-export type TelegramSettings = { hasToken: boolean; botUsername: string | null; chatId: string }
+export type TelegramSettings = { hasToken: boolean; botUsername: string | null }
 export type TelegramChat = { id: string; name: string }
 
 export type Session = { authenticated: boolean; email: string | null; setupRequired: boolean }
@@ -177,10 +177,10 @@ export const api = {
     post<{ status: string }>(`/api/connections/${id}/enablebanking/complete`, { code }),
 
   telegramSettings: () => get<TelegramSettings>('/api/notifications/telegram'),
-  saveTelegramSettings: (body: { botToken?: string | null; chatId?: string | null }) =>
+  saveTelegramSettings: (body: { botToken: string | null }) =>
     patch<TelegramSettings>('/api/notifications/telegram', body),
-  telegramTest: (chatId?: string) =>
-    post<{ sentTo: string }>('/api/notifications/telegram/test', { chatId: chatId ?? null }),
+  telegramTest: (chatId: string) =>
+    post<{ sentTo: string }>('/api/notifications/telegram/test', { chatId }),
   telegramChats: () => get<TelegramChat[]>('/api/notifications/telegram/chats'),
 
   syncAll: () => post<{ started: string[] }>('/api/sync'),

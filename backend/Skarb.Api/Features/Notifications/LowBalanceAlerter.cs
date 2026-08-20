@@ -105,11 +105,11 @@ public class LowBalanceAlerter(
                 continue;
             }
 
-            var chatId = account.LowBalanceChatId ?? settings.TelegramChatId;
+            var chatId = account.LowBalanceChatId;
             if (string.IsNullOrWhiteSpace(settings.TelegramBotToken) || string.IsNullOrWhiteSpace(chatId))
             {
                 logger.LogWarning(
-                    "{Account} is below its low-balance threshold but Telegram is not configured — no alert sent",
+                    "{Account} is below its low-balance threshold but has no bot or chat configured — no alert sent",
                     account.Name);
                 continue;
             }

@@ -7,8 +7,9 @@ using Skarb.Api.Infrastructure.Notifications;
 namespace Skarb.Api.Features.Notifications;
 
 /// <param name="BotToken">Null = keep the stored token; empty = disconnect the bot; otherwise validated and stored.</param>
-/// <param name="ChatId">Null = keep the stored default chat.</param>
-public record SaveTelegramRequest(string? BotToken, string? ChatId);
+public record SaveTelegramRequest(string? BotToken);
+/// <param name="ChatId">The chat to prove delivery to — tests run from the account editor, next to the chat being picked.</param>
+public record TelegramTestRequest(string? ChatId);
 
 public class NotificationEndpoints : IEndpointGroup
 {
@@ -24,7 +25,6 @@ public class NotificationEndpoints : IEndpointGroup
             {
                 hasToken = !string.IsNullOrWhiteSpace(s.TelegramBotToken),
                 botUsername = s.TelegramBotUsername,
-                chatId = s.TelegramChatId,
             };
         });
 
@@ -46,7 +46,6 @@ public class NotificationEndpoints : IEndpointGroup
                 s.TelegramBotUsername = token.Length == 0 ? null : await telegram.GetBotUsernameAsync(token, ct);
                 s.TelegramBotToken = token;
             }
-            if (req.ChatId is not null) s.TelegramChatId = req.ChatId.Trim();
             s.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(ct);
 
@@ -58,21 +57,19 @@ public class NotificationEndpoints : IEndpointGroup
             {
                 hasToken = !string.IsNullOrWhiteSpace(s.TelegramBotToken),
                 botUsername = s.TelegramBotUsername,
-                chatId = s.TelegramChatId,
             });
         });
 
-        group.MapPost("/test", async (SaveTelegramRequest req, SkarbDbContext db,
+        group.MapPost("/test", async (TelegramTestRequest req, SkarbDbContext db,
             TelegramApiClient telegram, CancellationToken ct) =>
         {
-            var s = await db.NotificationSettings.AsNoTracking().FirstOrDefaultAsync(ct) ?? new NotificationSettings();
-            var chatId = string.IsNullOrWhiteSpace(req.ChatId) ? s.TelegramChatId : req.ChatId.Trim();
-            if (string.IsNullOrWhiteSpace(chatId))
-                throw new InvalidOperationException("No chat id to send to — set a default chat or pass one.");
+            if (string.IsNullOrWhiteSpace(req.ChatId))
+                throw new InvalidOperationException("No chat id to send to — pick one first.");
 
-            await telegram.SendMessageAsync(s.TelegramBotToken, chatId,
+            var s = await db.NotificationSettings.AsNoTracking().FirstOrDefaultAsync(ct) ?? new NotificationSettings();
+            await telegram.SendMessageAsync(s.TelegramBotToken, req.ChatId.Trim(),
                 "✅ Skarb can reach this chat. Low-balance alerts will arrive here.", ct);
-            return Results.Ok(new { sentTo = chatId });
+            return Results.Ok(new { sentTo = req.ChatId.Trim() });
         });
 
         // Who has talked to the bot lately — lets the user pick a chat instead of finding its id.

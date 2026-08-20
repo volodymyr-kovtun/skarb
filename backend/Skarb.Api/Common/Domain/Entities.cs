@@ -1,4 +1,4 @@
-namespace Skarb.Api.Common.Domain;
+﻿namespace Skarb.Api.Common.Domain;
 
 public static class ProviderNames
 {
@@ -20,6 +20,24 @@ public static class TransactionSources
     public const string Sync = "sync";
     public const string Webhook = "webhook";
     public const string Import = "import";
+}
+
+/// <summary>
+/// Which signal decided <see cref="Transaction.IsInternal"/>. <see cref="Manual"/> means the user
+/// decided it by hand — it records their call either way, so an un-marked pair stays un-marked
+/// instead of being re-detected on the next sync. The rest are owned by the detector, and each
+/// signal only ever revisits its own rows.
+/// </summary>
+public static class InternalSources
+{
+    /// <summary>Counterparty IBAN belongs to one of the user's own accounts.</summary>
+    public const string Iban = "iban";
+    /// <summary>Bank-issued reference shared by both legs (PKO's "FX…" exchange id).</summary>
+    public const string Reference = "reference";
+    /// <summary>Opposite-amount legs on two accounts, close in time.</summary>
+    public const string Pair = "pair";
+    /// <summary>Set by the user, never by detection.</summary>
+    public const string Manual = "manual";
 }
 
 public static class ConnectionStatuses
@@ -92,6 +110,11 @@ public class Transaction
     public bool IsInternal { get; set; }
     /// <summary>Links the two legs of a detected internal transfer.</summary>
     public Guid? TransferGroupId { get; set; }
+    /// <summary>
+    /// Which signal set <see cref="IsInternal"/> — see <see cref="InternalSources"/>. Null means
+    /// nothing has decided yet. Detection skips rows the user decided and only re-evaluates its own.
+    /// </summary>
+    public string? InternalSource { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 

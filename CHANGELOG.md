@@ -49,8 +49,13 @@ All notable changes to Skarb are documented here. The format follows
   transaction list. Selecting it in the account filter still shows them. Archived accounts are
   now held to the same rule — previously they were dropped from net worth but their spending
   still reached the overview's charts and the transaction list.
-- Internal transfer detection (own-IBAN match + opposite-amount pairs within 72 h) with
-  manual override.
+- Internal transfer detection (own-IBAN match, bank-issued shared reference, and
+  opposite-amount pairs within 72 h) with manual override. Pairing settles the closest
+  match in time first, so a distant leg cannot claim a credit that another leg matches to
+  the second — the case that left one half of a transfer counted as income when the second
+  bank was connected later. Connecting that bank now re-examines the pairings made without
+  it. An override records that you made it, in both directions, so a pair you un-mark stays
+  un-marked instead of being re-detected on the next sync.
 - Investment tracking via investment-kind categories (Brokerage, Crypto seeded; IBKR rules).
 - Category management with emoji, color, kind and keyword auto-categorization rules;
   built-in MCC mapping for card transactions.

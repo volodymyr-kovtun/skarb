@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Skarb.Api.Common.Abstractions;
 using Skarb.Api.Common.Contracts;
 using Skarb.Api.Common.Domain;
@@ -110,7 +110,9 @@ public class TransactionEndpoints : IEndpointGroup
 
             if (req.IsInternal is bool isInternal && isInternal != tx.IsInternal)
             {
-                // Un-marking one leg of a detected pair releases both.
+                // Un-marking one leg of a detected pair releases both. Both are stamped manual:
+                // without that they look untouched to the detector, which pairs them straight
+                // back up on the next sync.
                 if (!isInternal && tx.TransferGroupId is Guid groupId)
                 {
                     var legs = await db.Transactions.Where(t => t.TransferGroupId == groupId).ToListAsync();
@@ -118,11 +120,13 @@ public class TransactionEndpoints : IEndpointGroup
                     {
                         leg.IsInternal = false;
                         leg.TransferGroupId = null;
+                        leg.InternalSource = InternalSources.Manual;
                     }
                 }
                 else
                 {
                     tx.IsInternal = isInternal;
+                    tx.InternalSource = InternalSources.Manual;
                 }
             }
 

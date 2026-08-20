@@ -22,9 +22,10 @@ Built for a PKO BP + ZEN + Monobank setup, but works with 2,500+ European banks.
   setup token printed to the server log; there is no signup.
 - **Overview dashboard** — net worth across all currencies, monthly
   earned / spent / **invested** / net, 6-month cashflow chart, and a spending donut that
-  flips between **categories and tags** — so "what did the renovation cost this month"
-  is one click, and each tag opens the transactions behind it. A switcher re-reports the
-  whole page in any of your account currencies (or EUR/USD), converted at today's rates.
+  flips between **categories, accounts and tags** — so "what did the renovation cost this
+  month" and "how much went out of the PKO account" are each one click, and every account
+  or tag opens the transactions behind it. A switcher re-reports the whole page in any of
+  your account currencies (or EUR/USD), converted at today's rates.
 - **Internal transfer detection** — moving money between your own accounts (e.g. between two
   PKO accounts) is detected automatically, marked *internal* and never counted in any metric.
   Detection uses two signals: the counterparty IBAN matching one of your accounts, and

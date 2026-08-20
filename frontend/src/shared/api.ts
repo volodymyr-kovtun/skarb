@@ -30,6 +30,8 @@ export type Dashboard = {
   prevMonth: { income: number; expense: number; invested: number }
   allTimeInvested: number
   spendingByCategory: { categoryId: string | null; name: string; emoji: string; color: string; amount: number }[]
+  /** This month's spending cut by the account it left from. */
+  spendingByAccount: { accountId: string; name: string; bank: string; color: string; amount: number }[]
   spendingByTag: { tagId: string; name: string; color: string; amount: number }[]
   /** This month's spending carrying no tag at all. */
   untaggedSpending: number
@@ -194,7 +196,7 @@ export function fmtMoney(amount: number, currency: string, opts?: { sign?: boole
   return sign + f.format(Math.abs(amount))
 }
 
-export const accountLabel = (a: Account) => (a.bank ? `${a.bank} · ` : '') + a.name
+export const accountLabel = (a: { bank: string; name: string }) => (a.bank ? `${a.bank} · ` : '') + a.name
 
 /** Every mutation invalidates everything — the app is small and the query graph isn't worth hand-maintaining. */
 export const refreshAll = (qc: import('@tanstack/react-query').QueryClient) => qc.invalidateQueries()

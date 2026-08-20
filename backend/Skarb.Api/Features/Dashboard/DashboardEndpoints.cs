@@ -98,7 +98,7 @@ public class DashboardEndpoints : IEndpointGroup
                 allTimeInvested += await fx.ConvertAsync(-row.Sum, row.Currency, display); // outgoing = positive contribution
 
             // Everything the month counts as spending — investments live in their own tile,
-            // not here. Both breakdowns below read from this one definition.
+            // not here. All three breakdowns below read from this one definition.
             var monthSpending = db.Transactions
                 .OnCountedAccounts()
                 .Where(t => !t.IsExcluded && !t.IsInternal && t.Amount < 0 && t.OccurredAt >= monthStart &&
@@ -129,6 +129,34 @@ public class DashboardEndpoints : IEndpointGroup
                         color = cat?.Color ?? "#CBD5E1",
                         amount = Math.Round(kv.Value, 2),
                     };
+                })
+                .OrderByDescending(x => x.amount)
+                .ToList();
+
+            // Spending by account, current month — the same money, cut by where it left from.
+            // Like categories, these partition the month — a transaction sits on exactly one account.
+            var accountRows = await monthSpending
+                .GroupBy(t => new { t.AccountId, t.Currency })
+                .Select(g => new { g.Key.AccountId, g.Key.Currency, Sum = g.Sum(t => t.Amount) })
+                .ToListAsync();
+            var byAccount = new Dictionary<Guid, decimal>();
+            foreach (var row in accountRows)
+            {
+                var v = await fx.ConvertAsync(-row.Sum, row.Currency, display);
+                byAccount[row.AccountId] = byAccount.GetValueOrDefault(row.AccountId) + v;
+            }
+            // The accounts loaded above are exactly the counted ones this spending is narrowed to,
+            // so a row that cannot be named would mean the two disagreed — drop it rather than throw.
+            var accountsById = accounts.ToDictionary(a => a.Id);
+            var spendingByAccount = byAccount
+                .Where(kv => accountsById.ContainsKey(kv.Key))
+                .Select(kv => new
+                {
+                    accountId = kv.Key,
+                    name = accountsById[kv.Key].Name,
+                    bank = accountsById[kv.Key].Bank,
+                    color = accountsById[kv.Key].Color,
+                    amount = Math.Round(kv.Value, 2),
                 })
                 .OrderByDescending(x => x.amount)
                 .ToList();
@@ -188,6 +216,7 @@ public class DashboardEndpoints : IEndpointGroup
                 prevMonth = new { income = prevIncome, expense = prevExpense, invested = prevInvested },
                 allTimeInvested = Math.Round(allTimeInvested, 2),
                 spendingByCategory,
+                spendingByAccount,
                 spendingByTag,
                 untaggedSpending = Math.Round(untaggedSpending, 2),
                 multiTagCount,

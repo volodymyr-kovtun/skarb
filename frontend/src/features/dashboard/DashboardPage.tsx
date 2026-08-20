@@ -6,7 +6,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area,
 } from 'recharts'
-import { api, fmtMoney } from '../../shared/api'
+import { accountLabel, api, fmtMoney } from '../../shared/api'
 import {
   Card, CardHeader, CurrencySwitch, Segmented, TxRow, labelCls, quietLinkCls,
 } from '../../shared/ui'
@@ -15,10 +15,10 @@ import { useChartColors, useIsDark } from '../../shared/theme'
 import { swatch } from '../../shared/color'
 import AccountsCard from './AccountsCard'
 
-type Breakdown = 'category' | 'tag'
+type Breakdown = 'category' | 'tag' | 'account'
 
 /** One wedge of the spending donut, whichever way the month is broken down. */
-type Slice = { key: string; name: string; color: string; amount: number; href?: string }
+type Slice = { key: string; name: string; color: string; amount: number; href?: string; hint?: string }
 
 export default function DashboardPage() {
   const [currency, pickCurrency] = useDisplayCurrency()
@@ -42,6 +42,12 @@ export default function DashboardPage() {
   const categorySlices: Slice[] = data.spendingByCategory.map((s) => ({
     key: s.categoryId ?? 'uncategorized', name: s.name, color: s.color, amount: s.amount,
   }))
+  // Which account the month left from. The legend is a narrow column, so the account name
+  // carries the line and the bank rides along in the hover. Each one opens its transactions.
+  const accountSlices: Slice[] = data.spendingByAccount.map((a) => ({
+    key: a.accountId, name: a.name, color: a.color, amount: a.amount,
+    hint: accountLabel(a), href: `/transactions?account=${a.accountId}`,
+  }))
   // Tagged spending, with the untagged remainder as its own wedge so the ring still
   // covers the month. Each tag opens the transactions behind it.
   const tagSlices: Slice[] = [
@@ -53,7 +59,8 @@ export default function DashboardPage() {
       ? [{ key: 'untagged', name: 'Untagged', color: c.uncategorized, amount: data.untaggedSpending }]
       : []),
   ].sort((a, b) => b.amount - a.amount)
-  const donut = topSlices(breakdown === 'category' ? categorySlices : tagSlices)
+  const donut = topSlices(
+    breakdown === 'category' ? categorySlices : breakdown === 'account' ? accountSlices : tagSlices)
   const nothingTagged = breakdown === 'tag' && data.spendingByTag.length === 0
 
   return (
@@ -93,14 +100,18 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
-        {/* Spending, by category or by tag */}
+        {/* Spending, by category, account or tag */}
         <Card className="pb-7 lg:col-span-2">
           <CardHeader
             title="Where it went"
             action={
               <Segmented
                 value={breakdown}
-                options={[{ value: 'category', label: 'Categories' }, { value: 'tag', label: 'Tags' }]}
+                options={[
+                  { value: 'category', label: 'Categories' },
+                  { value: 'account', label: 'Accounts' },
+                  { value: 'tag', label: 'Tags' },
+                ]}
                 onChange={(v) => setBreakdown(v as Breakdown)}
                 label="Break spending down by"
               />
@@ -256,7 +267,7 @@ function topSlices(slices: Slice[], limit = 6): Slice[] {
   return [...slices.slice(0, limit), { key: 'other', name: 'Other', color: '#91897C', amount: +rest.toFixed(2) }]
 }
 
-/** A legend line. Tags link to the transactions behind them; categories have nowhere to go yet. */
+/** A legend line. Accounts and tags link to the transactions behind them; categories have nowhere to go yet. */
 function SliceRow({ slice, cur, dark }: { slice: Slice; cur: string; dark: boolean }) {
   const body = (
     <>
@@ -266,9 +277,11 @@ function SliceRow({ slice, cur, dark }: { slice: Slice; cur: string; dark: boole
     </>
   )
   const cls = 'flex w-full items-center gap-2.5 text-[13.5px]'
+  // Long names truncate in this column — the full one is always a hover away.
+  const title = slice.hint ?? slice.name
   return slice.href
-    ? <Link to={slice.href} className={`group ${cls}`}>{body}</Link>
-    : <span className={cls}>{body}</span>
+    ? <Link to={slice.href} title={title} className={`group ${cls}`}>{body}</Link>
+    : <span className={cls} title={title}>{body}</span>
 }
 
 function StatTile({ label, value, prev, cur, tone, footer, signed = false }:

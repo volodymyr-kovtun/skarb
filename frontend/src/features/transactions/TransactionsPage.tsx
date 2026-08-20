@@ -24,12 +24,13 @@ export default function TransactionsPage() {
   const qc = useQueryClient()
   const { data: meta } = useQuery({ queryKey: ['meta'], queryFn: api.meta })
 
+  // Followed in from a link elsewhere: ?account=<id> and ?tags=<id> start the
+  // filters where the link pointed.
+  const [searchParams] = useSearchParams()
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [accountId, setAccountId] = useState('')
+  const [accountId, setAccountId] = useState(() => searchParams.get('account') ?? '')
   const [categoryId, setCategoryId] = useState('')
-  // Followed in from the Tags page: ?tags=<id> starts the filter where the link pointed.
-  const [searchParams] = useSearchParams()
   const [tagIds, setTagIds] = useState<string[]>(() => searchParams.getAll('tags'))
   const [hideInternal, setHideInternal] = useState(false)
   const [page, setPage] = useState(1)

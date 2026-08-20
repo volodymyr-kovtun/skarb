@@ -36,9 +36,13 @@ All notable changes to Skarb are documented here. The format follows
 - Transactions: search, filters (account, category, tag, uncategorized, internal transfers,
   investments), manual add / edit / delete, notes, tags. The tag filter takes several tags
   at once and matches transactions carrying any of them.
-- Spending by tag: the overview's spending donut switches between categories and tags,
-  with the untagged remainder as its own slice and each tag linking to the transactions
-  behind it. Tags are renamed, recolored and deleted on the Categories page.
+- Spending by tag: the overview's spending donut can break the month down by tag, with the
+  untagged remainder as its own slice and each tag linking to the transactions behind it.
+  Tags are renamed, recolored and deleted on the Categories page.
+- Spending by account: the same donut also breaks the month down by the account the money
+  left from, each slice linking to that account's transactions. It cuts the same month the
+  category breakdown does, so internal transfers, investments, manually excluded
+  transactions and accounts marked *don't count* stay out of it.
 - Accounts can be marked *don't count*: the account still syncs and the Accounts tab still
   reports its balance, but it contributes nothing to net worth, the month tiles, the cashflow
   chart, the spending breakdowns or recent activity, and its transactions drop out of the

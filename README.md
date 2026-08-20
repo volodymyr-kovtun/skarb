@@ -48,7 +48,7 @@ Built for a PKO BP + ZEN + Monobank setup, but works with 2,500+ European banks.
   - **PKO BP + any Enable Banking bank** — the picker lists every supported institution
     across Europe (or per country), free for personal use
   - **ZEN** — CSV statement import (ZEN has no API; see the guide)
-  - background auto-sync every 30 minutes + "Sync now" button
+  - background auto-sync every hour + "Sync now" button
 - **CSV import** — presets for ZEN and PKO iPKO, configurable column mapping, duplicate-safe re-imports
 
 ## Quick start

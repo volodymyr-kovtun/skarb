@@ -47,7 +47,18 @@ public class Account
     public string? Iban { get; set; }
     public string? MaskedPan { get; set; }
     public string Color { get; set; } = "#4F46E5";
+    /// <summary>
+    /// Closed and put away: hidden from the overview, skipped by sync, and folded into
+    /// the archived section of the accounts page.
+    /// </summary>
     public bool IsArchived { get; set; }
+    /// <summary>
+    /// Kept out of the owner's picture while staying a live account: it still syncs, and the
+    /// accounts page still reports its balance, but it counts toward nothing on the overview
+    /// and its transactions stay out of the transaction list. For money you hold but don't
+    /// consider yours to spend.
+    /// </summary>
+    public bool IsExcluded { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public List<Transaction> Transactions { get; set; } = [];
 }

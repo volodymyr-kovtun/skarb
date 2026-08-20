@@ -25,8 +25,11 @@ public class DashboardEndpoints : IEndpointGroup
             // an unknown or missing request falls back to the configured base.
             var display = await DisplayCurrency.ResolveAsync(fx, currency);
 
-            // Net worth across accounts, converted to the display currency.
-            var accounts = await db.Accounts.Where(a => !a.IsArchived).OrderBy(a => a.CreatedAt).ToListAsync();
+            // Net worth across accounts, converted to the display currency. Archived accounts are
+            // closed and excluded ones are deliberately not counted, so neither reaches this page —
+            // and neither does anything below, which all reads through OnCountedAccounts().
+            var accounts = await db.Accounts.Where(a => !a.IsArchived && !a.IsExcluded)
+                .OrderBy(a => a.CreatedAt).ToListAsync();
             var netWorth = 0m;
             var accountDtos = new List<object>();
             foreach (var a in accounts)
@@ -39,6 +42,7 @@ public class DashboardEndpoints : IEndpointGroup
             // Money flows grouped in SQL by month + currency + direction + investment-ness.
             // Internal transfers and manually excluded transactions never count.
             var flowRows = await db.Transactions
+                .OnCountedAccounts()
                 .Where(t => !t.IsExcluded && !t.IsInternal && t.OccurredAt >= windowStart)
                 .GroupBy(t => new
                 {
@@ -83,6 +87,7 @@ public class DashboardEndpoints : IEndpointGroup
 
             // All-time net contributions to investment-kind categories.
             var investedRows = await db.Transactions
+                .OnCountedAccounts()
                 .Where(t => !t.IsExcluded && !t.IsInternal &&
                             t.Category != null && t.Category.Kind == CategoryKinds.Investment)
                 .GroupBy(t => t.Currency)
@@ -95,6 +100,7 @@ public class DashboardEndpoints : IEndpointGroup
             // Everything the month counts as spending — investments live in their own tile,
             // not here. Both breakdowns below read from this one definition.
             var monthSpending = db.Transactions
+                .OnCountedAccounts()
                 .Where(t => !t.IsExcluded && !t.IsInternal && t.Amount < 0 && t.OccurredAt >= monthStart &&
                             (t.Category == null || t.Category.Kind != CategoryKinds.Investment));
 
@@ -160,6 +166,7 @@ public class DashboardEndpoints : IEndpointGroup
             var multiTagCount = await monthSpending.CountAsync(t => t.Tags.Count > 1);
 
             var recent = await db.Transactions
+                .OnCountedAccounts()
                 .Include(t => t.Account).Include(t => t.Category).Include(t => t.Tags)
                 .OrderByDescending(t => t.OccurredAt).ThenByDescending(t => t.CreatedAt)
                 .Take(8).ToListAsync();

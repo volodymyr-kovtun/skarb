@@ -31,7 +31,10 @@ public class TransactionEndpoints : IEndpointGroup
                 .Include(t => t.Account).Include(t => t.Category).Include(t => t.Tags)
                 .AsQueryable();
 
+            // Excluded and archived accounts are out of the picture, so their transactions stay out
+            // of the list too. Naming one in the account filter is the deliberate way back in.
             if (accountId is Guid a) q = q.Where(t => t.AccountId == a);
+            else q = q.OnCountedAccounts();
             if (categoryId is Guid c) q = q.Where(t => t.CategoryId == c);
             // Several tags read as "any of these" — narrowing to transactions carrying all of
             // them would return almost nothing, since a transaction rarely wears two labels.

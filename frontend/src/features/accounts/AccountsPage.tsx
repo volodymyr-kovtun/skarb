@@ -87,7 +87,14 @@ export default function AccountsPage() {
                     >
                       <Dot color={a.color} />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[14.5px] font-semibold">{a.name}</span>
+                        <span className="flex items-center gap-2">
+                          <span className="truncate text-[14.5px] font-semibold">{a.name}</span>
+                          {a.isExcluded && (
+                            <span className="shrink-0 rounded-full bg-surface2 px-2 py-0.5 text-[11px] font-semibold text-faint">
+                              not counted
+                            </span>
+                          )}
+                        </span>
                         <span className="mt-0.5 block truncate text-[12.5px] text-faint">
                           {a.currency}
                           {a.maskedPan ? ` · ${a.maskedPan.slice(-8)}` : a.iban ? ` · …${a.iban.slice(-6)}` : ''}
@@ -135,6 +142,7 @@ function AccountForm({ account, onClose, onSaved }:
   const [balance, setBalance] = useState('0')
   const [color, setColor] = useState(account?.color ?? ACCOUNT_COLORS[0])
   const [archived, setArchived] = useState(account?.isArchived ?? false)
+  const [excluded, setExcluded] = useState(account?.isExcluded ?? false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -143,7 +151,7 @@ function AccountForm({ account, onClose, onSaved }:
     setError('')
     try {
       if (isEdit) {
-        await api.updateAccount(account!.id, { name, color, isArchived: archived })
+        await api.updateAccount(account!.id, { name, color, isArchived: archived, isExcluded: excluded })
       } else {
         if (!name.trim()) { setError('Give the account a name.'); return }
         await api.createAccount({ name: name.trim(), bank: bank.trim(), currency, balance: parseFloat(balance || '0'), color })
@@ -197,10 +205,29 @@ function AccountForm({ account, onClose, onSaved }:
         </div>
 
         {isEdit && (
-          <label className="flex items-center gap-2 text-sm text-muted">
-            <input type="checkbox" checked={archived} onChange={(e) => setArchived(e.target.checked)} className="h-4 w-4 accent-[var(--sk-accent)]" />
-            Archive (hide from overview and stop syncing)
-          </label>
+          <div className="flex flex-col gap-3 border-t border-line pt-3">
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input type="checkbox" checked={excluded} onChange={(e) => setExcluded(e.target.checked)} className="h-4 w-4 accent-[var(--sk-accent)]" />
+                Don't count this account
+              </label>
+              <p className="mt-1 pl-6 text-xs leading-relaxed text-faint">
+                It keeps syncing and keeps showing its balance here, but it stops counting toward
+                net worth and everything else on the overview, and its transactions leave the
+                transactions list. Pick it in the account filter to see them again.
+              </p>
+            </div>
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input type="checkbox" checked={archived} onChange={(e) => setArchived(e.target.checked)} className="h-4 w-4 accent-[var(--sk-accent)]" />
+                Archive
+              </label>
+              <p className="mt-1 pl-6 text-xs leading-relaxed text-faint">
+                For an account you've closed: the same, and it stops syncing and moves out of the
+                list above.
+              </p>
+            </div>
+          </div>
         )}
 
         {error && <p className="text-sm text-danger">{error}</p>}

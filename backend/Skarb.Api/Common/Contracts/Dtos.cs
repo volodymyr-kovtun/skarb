@@ -8,7 +8,7 @@ public record TagDto(Guid Id, string Name, string Color);
 public record AccountDto(
     Guid Id, string Name, string Bank, string Provider, string Currency,
     decimal Balance, string? Iban, string? MaskedPan, string Color,
-    bool IsArchived, Guid? ConnectionId);
+    bool IsArchived, bool IsExcluded, Guid? ConnectionId);
 
 public record TransactionDto(
     Guid Id, Guid AccountId, string AccountName, string AccountColor, string Bank,
@@ -25,7 +25,7 @@ public static class Map
 
     public static AccountDto ToDto(this Account a) => new(
         a.Id, a.Name, a.Bank, a.Provider, a.Currency, a.Balance,
-        a.Iban, a.MaskedPan, a.Color, a.IsArchived, a.ConnectionId);
+        a.Iban, a.MaskedPan, a.Color, a.IsArchived, a.IsExcluded, a.ConnectionId);
 
     public static TransactionDto ToDto(this Transaction t) => new(
         t.Id, t.AccountId, t.Account?.Name ?? "", t.Account?.Color ?? "#64748B",

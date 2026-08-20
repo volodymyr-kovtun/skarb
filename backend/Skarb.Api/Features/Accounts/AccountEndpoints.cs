@@ -6,7 +6,7 @@ using Skarb.Api.Common.Persistence;
 namespace Skarb.Api.Features.Accounts;
 
 public record CreateAccountRequest(string Name, string Bank, string Currency, decimal Balance, string? Color);
-public record UpdateAccountRequest(string? Name, string? Color, bool? IsArchived);
+public record UpdateAccountRequest(string? Name, string? Color, bool? IsArchived, bool? IsExcluded);
 
 public class AccountEndpoints : IEndpointGroup
 {
@@ -50,6 +50,7 @@ public class AccountEndpoints : IEndpointGroup
             if (req.Name is not null) account.Name = req.Name;
             if (req.Color is not null) account.Color = req.Color;
             if (req.IsArchived is bool archived) account.IsArchived = archived;
+            if (req.IsExcluded is bool excluded) account.IsExcluded = excluded;
             await db.SaveChangesAsync();
             return Results.Ok(account.ToDto());
         });

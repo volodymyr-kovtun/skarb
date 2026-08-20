@@ -35,6 +35,11 @@ Built for a PKO BP + ZEN + Monobank setup, but works with 2,500+ European banks.
   toward "Invested" — this month and all time — and never inflate your spending.
 - **Transactions** — search, filters (account, category, tag, plus *internal* and
   *investments* views), day grouping, manual add/edit/delete, notes, tags
+- **Accounts you don't count** — money you hold but don't consider yours to spend (a shared
+  pot, someone else's savings) can be marked *don't count* in the account editor. The account
+  keeps syncing and the Accounts tab keeps reporting its balance, but it contributes nothing
+  to net worth or any overview figure, and its transactions leave the transaction list —
+  picking it in the account filter is the way back to them.
 - **Category management** — full CRUD with emoji, color and kind, usage counts, plus
   keyword auto-categorization rules, built-in MCC mapping for Monobank, and the tags
   themselves (rename, recolor, delete)

@@ -6,7 +6,7 @@ export type Tag = { id: string; name: string; color: string }
 export type Account = {
   id: string; name: string; bank: string; provider: string; currency: string
   balance: number; iban: string | null; maskedPan: string | null; color: string
-  isArchived: boolean; connectionId: string | null
+  isArchived: boolean; isExcluded: boolean; connectionId: string | null
 }
 
 export type Tx = {
@@ -128,7 +128,7 @@ export const api = {
 
   createAccount: (body: { name: string; bank: string; currency: string; balance: number; color?: string }) =>
     post<Account>('/api/accounts', body),
-  updateAccount: (id: string, body: { name?: string; color?: string; isArchived?: boolean }) =>
+  updateAccount: (id: string, body: { name?: string; color?: string; isArchived?: boolean; isExcluded?: boolean }) =>
     patch<Account>(`/api/accounts/${id}`, body),
   deleteAccount: (id: string) => del(`/api/accounts/${id}`),
 

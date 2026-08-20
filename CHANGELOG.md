@@ -39,6 +39,12 @@ All notable changes to Skarb are documented here. The format follows
 - Spending by tag: the overview's spending donut switches between categories and tags,
   with the untagged remainder as its own slice and each tag linking to the transactions
   behind it. Tags are renamed, recolored and deleted on the Categories page.
+- Accounts can be marked *don't count*: the account still syncs and the Accounts tab still
+  reports its balance, but it contributes nothing to net worth, the month tiles, the cashflow
+  chart, the spending breakdowns or recent activity, and its transactions drop out of the
+  transaction list. Selecting it in the account filter still shows them. Archived accounts are
+  now held to the same rule — previously they were dropped from net worth but their spending
+  still reached the overview's charts and the transaction list.
 - Internal transfer detection (own-IBAN match + opposite-amount pairs within 72 h) with
   manual override.
 - Investment tracking via investment-kind categories (Brokerage, Crypto seeded; IBKR rules).

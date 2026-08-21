@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom'
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import { Landmark, Plug, Upload, Trash2, RefreshCw, Webhook, CheckCircle2, AlertCircle, History, Pencil } from 'lucide-react'
 import { accountLabel, api, refreshAll, type Connection, type Meta } from '../../shared/api'
-import { Card, CardHeader, Modal, btnGhost, btnPrimary, errMsg, fieldLabelCls, inputCls } from '../../shared/ui'
+import { Card, CardHeader, Modal, btnGhost, btnPrimary, cardPadX, errMsg, fieldLabelCls, inputCls, pageTitleCls } from '../../shared/ui'
 import { SecuritySettings } from '../auth/SecuritySettings'
 
 export default function SettingsPage() {
@@ -38,7 +38,7 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h1 className="font-display text-[30px] font-semibold tracking-[-0.02em]">Settings</h1>
+        <h1 className={pageTitleCls}>Settings</h1>
         <p className="mt-2 text-[14.5px] text-muted">Bank connections, imports, alerts and automation.</p>
       </div>
 
@@ -53,7 +53,7 @@ export default function SettingsPage() {
       {/* Connections */}
       <Card className="pb-7">
         <CardHeader title="Bank connections" />
-        <div className="flex flex-col gap-3 px-7 pt-1">
+        <div className={`flex flex-col gap-3 pt-1 ${cardPadX}`}>
           {(connections ?? []).length === 0 && (
             <p className="text-sm text-muted">
               Nothing connected yet. Link Monobank with a personal token, or any of 2,500+ European banks
@@ -80,7 +80,7 @@ export default function SettingsPage() {
       {/* Sync activity */}
       <Card className="pb-6">
         <CardHeader title="Sync activity" />
-        <div className="px-7 pt-1">
+        <div className={`${cardPadX} pt-1`}>
           {(status?.logs ?? []).length === 0 ? (
             <p className="pb-3 text-sm text-faint">No syncs yet.</p>
           ) : (
@@ -152,7 +152,7 @@ function NotificationsCard() {
   return (
     <Card className="pb-7">
       <CardHeader title="Notifications" />
-      <div className="flex flex-col gap-3 px-7 pt-1">
+      <div className={`flex flex-col gap-3 pt-1 ${cardPadX}`}>
         <p className="text-sm text-muted">
           Skarb can ping a Telegram chat the moment an account drops below its limit — handy when
           someone else tops the card up. Create a bot with{' '}

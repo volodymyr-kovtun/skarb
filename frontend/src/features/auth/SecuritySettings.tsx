@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { KeyRound, ShieldCheck } from 'lucide-react'
 import { api } from '../../shared/api'
-import { Card, CardHeader, Modal, btnGhost, btnPrimary, errMsg, fieldLabelCls, inputCls } from '../../shared/ui'
+import { Card, CardHeader, Modal, btnGhost, btnPrimary, cardPadX, errMsg, fieldLabelCls, inputCls } from '../../shared/ui'
 import { RecoveryCodes } from './RecoveryCodes'
 
 const MIN_PASSWORD = 12
@@ -19,7 +19,7 @@ export function SecuritySettings() {
   return (
     <Card className="pb-7">
       <CardHeader title="Security" />
-      <div className="flex flex-col px-7 pt-1">
+      <div className={`flex flex-col pt-1 ${cardPadX}`}>
         <Row label="Signed in as" value={session?.email ?? '—'} />
 
         <Row

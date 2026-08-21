@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Search, X } from 'lucide-react'
 import { api, refreshAll, type CategoryKind, type CategoryWithCount, type Tag } from '../../shared/api'
-import { CATEGORY_COLORS, Card, CardHeader, CategoryDot, ColorPicker, Dot, Modal, ModalActions, btnGhost, btnPrimary, errMsg, fieldLabelCls, inputCls, quietLinkCls } from '../../shared/ui'
+import { CATEGORY_COLORS, Card, CardHeader, CategoryDot, ColorPicker, Dot, Modal, ModalActions, btnGhost, btnPrimary, cardPadX, errMsg, fieldLabelCls, inputCls, pageTitleCls, quietLinkCls } from '../../shared/ui'
 import { useIsDark } from '../../shared/theme'
 import { swatch, tint } from '../../shared/color'
 
@@ -22,7 +22,7 @@ export default function CategoriesPage() {
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h1 className="font-display text-[30px] font-semibold tracking-[-0.02em]">Categories</h1>
+        <h1 className={pageTitleCls}>Categories</h1>
         <p className="mt-2 max-w-2xl text-[14.5px] leading-relaxed text-muted">
           How your money gets labeled. New bank transactions are categorized automatically by your rules and card codes.
         </p>
@@ -40,8 +40,8 @@ export default function CategoriesPage() {
                 </button>
               }
             />
-            <p className="px-7 pb-4 text-[13px] text-faint">{KIND_META[kind].blurb}</p>
-            <div className="grid grid-cols-1 gap-3 px-7 sm:grid-cols-2 xl:grid-cols-4">
+            <p className={`${cardPadX} pb-4 text-[13px] text-faint`}>{KIND_META[kind].blurb}</p>
+            <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 ${cardPadX}`}>
               {items.map((c) => (
                 <button
                   key={c.id}
@@ -111,11 +111,11 @@ function TagsCard() {
           </button>
         }
       />
-      <p className="max-w-3xl px-7 pb-4 text-[13px] leading-relaxed text-faint">
+      <p className={`max-w-3xl pb-4 text-[13px] leading-relaxed text-faint ${cardPadX}`}>
         Free-form labels, finer than a category and stackable — #vacation, #renovation. Attach them
         in the transaction editor; the overview reports what each one costs this month.
       </p>
-      <div className="flex flex-wrap gap-2.5 px-7">
+      <div className={`flex flex-wrap gap-2.5 ${cardPadX}`}>
         {tags.map((t) => (
           <button
             key={t.id}
@@ -240,7 +240,7 @@ function RulesCard() {
           </button>
         }
       />
-      <div className="px-7 pt-1">
+      <div className={`${cardPadX} pt-1`}>
         <p className="mb-4 max-w-3xl text-[14px] leading-relaxed text-muted">
           When a new transaction's description contains a keyword, it gets the category automatically —
           e.g. <code className="rounded-md bg-surface2 px-2 py-0.5 text-[12.5px]">ibkr</code> → 📈 Brokerage counts as investing.

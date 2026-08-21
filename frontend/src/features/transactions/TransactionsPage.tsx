@@ -7,7 +7,8 @@ import {
   accountLabel, api, refreshAll, type Category, type Meta, type RuleSuggestion, type Tag, type Tx,
 } from '../../shared/api'
 import {
-  Card, Modal, ModalActions, TxRow, btnGhost, btnPrimary, dayLabel, errMsg, fieldLabelCls, inputCls, labelCls, pillCls,
+  Card, Modal, ModalActions, TxRow, btnGhost, btnPrimary, dayLabel, errMsg, fieldLabelCls, inputCls, labelCls,
+  pageTitleCls, pillCls,
 } from '../../shared/ui'
 import { useIsDark } from '../../shared/theme'
 import { swatch } from '../../shared/color'
@@ -16,6 +17,12 @@ import { RuleOfferSheet } from './RuleOfferSheet'
 /** Account and category filters: a native select wearing the same pill as everything else. */
 const selectPill =
   'h-11 shrink-0 rounded-full border-r-8 border-transparent bg-surface2 pl-4 text-sm font-semibold text-ink outline-none'
+
+/**
+ * Below `sm` the filter bar is two controls to a row. Left to size themselves the pills came
+ * out ragged — one filter alone on a line, two on the next — which read as a mistake.
+ */
+const halfWidth = 'w-[calc(50%-0.3125rem)]'
 
 const SPECIAL_FILTERS = {
   uncategorized: '· Uncategorized',
@@ -102,17 +109,18 @@ export default function TransactionsPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="font-display text-[30px] font-semibold tracking-[-0.02em]">Transactions</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
+        <h1 className={pageTitleCls}>Transactions</h1>
         <button className={btnPrimary} onClick={() => setAdding(true)}>
           <Plus size={16} />
-          Add transaction
+          {/* The page it sits on already says "transaction"; a phone needs the width more. */}
+          Add<span className="hidden sm:inline"> transaction</span>
         </button>
       </div>
 
       {/* Filter bar */}
       <Card className="flex flex-wrap items-center gap-2.5 p-3">
-        <label className="flex h-11 min-w-[15rem] flex-1 items-center gap-2.5 rounded-full bg-surface2 px-4 transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_var(--sk-accent)]">
+        <label className="flex h-11 w-full items-center gap-2.5 rounded-full bg-surface2 px-4 transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_var(--sk-accent)] sm:w-auto sm:min-w-[15rem] sm:flex-1">
           <Search size={17} className="shrink-0 text-faint" />
           <input
             className="h-full w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-faint"
@@ -127,7 +135,7 @@ export default function TransactionsPage() {
           )}
         </label>
         <select
-          className={`${selectPill} w-44`}
+          className={`${selectPill} ${halfWidth} sm:w-44`}
           value={accountId}
           onChange={(e) => { setAccountId(e.target.value); setPage(1) }}
         >
@@ -135,7 +143,7 @@ export default function TransactionsPage() {
           {meta?.accounts.map((a) => <option key={a.id} value={a.id}>{accountLabel(a)}</option>)}
         </select>
         <select
-          className={`${selectPill} w-48`}
+          className={`${selectPill} ${halfWidth} sm:w-48`}
           value={categoryId}
           onChange={(e) => { setCategoryId(e.target.value); setPage(1) }}
         >
@@ -210,7 +218,7 @@ function InternalToggle({ on, disabled, onChange }:
       title={disabled
         ? 'Not available while the internal-transfers filter is on'
         : 'Hide transfers between your own accounts'}
-      className={`${pillCls} ${on ? 'bg-accent text-paper hover:text-paper' : ''}`}
+      className={`${pillCls} ${halfWidth} justify-center sm:w-auto ${on ? 'bg-accent text-paper hover:text-paper' : ''}`}
     >
       <ArrowLeftRight size={15} />
       Hide internal
@@ -245,11 +253,11 @@ function TagFilter({ tags, selected, onChange }:
     : `${picked.length} tags`
 
   return (
-    <div className="relative shrink-0" ref={ref}>
+    <div className={`relative shrink-0 ${halfWidth} sm:w-auto`} ref={ref}>
       <button
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        className={`${pillCls} ${picked.length ? 'bg-accent text-paper hover:text-paper' : ''}`}
+        className={`${pillCls} w-full justify-center sm:w-auto ${picked.length ? 'bg-accent text-paper hover:text-paper' : ''}`}
       >
         <TagIcon size={15} />
         <span className="max-w-32 truncate">{label}</span>

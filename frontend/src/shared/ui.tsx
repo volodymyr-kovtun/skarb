@@ -25,8 +25,16 @@ export function Mark({ size = 'lg' }: { size?: 'sm' | 'lg' }) {
 export const labelCls = 'text-[11px] font-semibold uppercase tracking-[0.1em] text-faint'
 /** The heading on a card. Real titles, not small caps. */
 export const sectionTitleCls = 'font-display text-[17px] font-semibold'
+/** The name of a page. It steps down on a phone so a title and its action share one row. */
+export const pageTitleCls = 'font-display text-[26px] font-semibold tracking-[-0.02em] sm:text-[30px]'
 /** Label above a form input. */
 export const fieldLabelCls = 'mb-1.5 block text-xs font-medium text-muted'
+/**
+ * The gutter a card's contents sit in. A phone cannot spare 28px on both sides — that is a
+ * sixth of the screen — so it tightens below `sm`. Card bodies use it to line up with
+ * <code>CardHeader</code>; change it here and every card follows.
+ */
+export const cardPadX = 'px-5 sm:px-7'
 
 /** Institution an account is grouped under. Manual accounts have no bank of their own. */
 export const bankLabel = (a: { bank: string }) => a.bank || 'Manual'
@@ -44,7 +52,7 @@ export function CardHeader({ title, subtitle, action }:
   return (
     // Wraps rather than squeezing: on a phone a title, a date and a three-way switch do not
     // share one line, and the casualty was always the range this header exists to state.
-    <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-7 pt-6 pb-3">
+    <header className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pt-6 pb-3 ${cardPadX}`}>
       <div className="min-w-0">
         <h2 className={sectionTitleCls}>{title}</h2>
         {/* Where a card counts from — said out loud, because no two cards here count the same days. */}
@@ -138,9 +146,14 @@ export function Modal({ title, onClose, children, wide = false }:
   }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/30 p-6 backdrop-blur-[3px]" onMouseDown={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/30 p-3 backdrop-blur-[3px] sm:p-6"
+      onMouseDown={onClose}
+    >
+      {/* A phone gets the dialog near the top of the screen and nearly its full width: these
+          forms are tall, and every margin spent here is a field pushed under the keyboard. */}
       <div
-        className={`mt-12 w-full ${wide ? 'max-w-2xl' : 'max-w-md'} rounded-card bg-surface p-7 shadow-pop`}
+        className={`mt-4 mb-4 w-full sm:mt-12 ${wide ? 'max-w-2xl' : 'max-w-md'} rounded-card bg-surface p-5 shadow-pop sm:p-7`}
         onMouseDown={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -275,10 +288,12 @@ export function TxRow({ tx, onClick }: { tx: Tx; onClick?: () => void }) {
             </span>
           ))}
         </p>
-        <p className="mt-0.5 flex items-center gap-1.5 truncate text-[12.5px] text-faint">
+        {/* Each part truncates on its own: `truncate` on the row would just clip the last
+            word off mid-letter, which is what a narrow phone got. */}
+        <p className="mt-0.5 flex items-center gap-1.5 text-[12.5px] text-faint">
           <Dot color={tx.accountColor} size={6} />
-          {tx.bank || tx.accountName}
-          {!tx.isInternal && tx.category && <span>· {tx.category.name}</span>}
+          <span className="truncate">{tx.bank || tx.accountName}</span>
+          {!tx.isInternal && tx.category && <span className="truncate">· {tx.category.name}</span>}
         </p>
       </div>
       <Money amount={tx.amount} currency={tx.currency} signed={!dimmed} muted={dimmed} className="text-[14.5px] font-semibold" />

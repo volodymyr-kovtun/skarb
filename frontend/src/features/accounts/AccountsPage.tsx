@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Landmark } from 'lucide-react'
 import { api, fmtMoney, refreshAll, type Account, type TelegramChat } from '../../shared/api'
-import { ACCOUNT_COLORS, Card, ColorPicker, Dot, Modal, ModalActions, bankLabel, btnGhost, btnPrimary, errMsg, fieldLabelCls, inputCls, sectionTitleCls } from '../../shared/ui'
+import { ACCOUNT_COLORS, Card, ColorPicker, Dot, Modal, ModalActions, bankLabel, btnGhost, btnPrimary, errMsg, fieldLabelCls, inputCls, pageTitleCls, sectionTitleCls } from '../../shared/ui'
 
 const providerLabel: Record<string, string> = {
   manual: 'Manual',
@@ -44,11 +44,11 @@ export default function AccountsPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="font-display text-[30px] font-semibold tracking-[-0.02em]">Accounts</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
+        <h1 className={pageTitleCls}>Accounts</h1>
         <button className={btnPrimary} onClick={() => setAdding(true)}>
           <Plus size={16} />
-          Add manual account
+          Add<span className="hidden sm:inline"> manual</span> account
         </button>
       </div>
 

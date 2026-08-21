@@ -5,6 +5,15 @@ All notable changes to Skarb are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- **The web app on a phone.** The five sections used to be a row of header pills that wrapped
+  onto two lines and claimed the top third of a phone screen before any money was on it. Below
+  `sm` they are now a bottom tab bar — an icon and a label per section, clear of the home
+  indicator — and the header keeps only the mark and the sync / theme / sign-out controls.
+  Card gutters, page titles, the transaction filter bar and every dialog tighten on narrow
+  screens as well, so a phone shows the figures instead of the chrome. Tablet and desktop
+  keep the header pills.
+
 ### Added
 - **Skarb for iPhone** ([ios/](ios/README.md)) — a native SwiftUI client on the same API,
   with the same password + TOTP sign-in and the same `skarb.session` cookie, so nothing is

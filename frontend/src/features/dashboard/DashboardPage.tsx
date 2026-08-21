@@ -8,7 +8,7 @@ import {
 } from 'recharts'
 import { accountLabel, api, fmtMoney } from '../../shared/api'
 import {
-  Card, CardHeader, CurrencySwitch, Segmented, TxRow, labelCls, quietLinkCls,
+  Card, CardHeader, CurrencySwitch, Segmented, TxRow, cardPadX, labelCls, quietLinkCls,
 } from '../../shared/ui'
 import { useDisplayCurrency } from '../../shared/currency'
 import {
@@ -77,7 +77,7 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-5">
       {/* Hero: net worth */}
-      <Card className="flex flex-col gap-8 px-8 py-9 lg:flex-row lg:items-center lg:justify-between lg:gap-14">
+      <Card className="flex flex-col gap-7 px-5 py-7 sm:gap-8 sm:px-8 sm:py-9 lg:flex-row lg:items-center lg:justify-between lg:gap-14">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <p className={labelCls}>Net worth</p>
@@ -148,14 +148,14 @@ export default function DashboardPage() {
             }
           />
           {nothingTagged ? (
-            <p className="px-7 py-12 text-center text-sm text-faint">
+            <p className={`${cardPadX} py-12 text-center text-sm text-faint`}>
               Nothing tagged {phrase}. Tags are free-form labels — open a{' '}
               <Link to="/transactions" className="font-semibold text-ink underline">transaction</Link> to add one.
             </p>
           ) : donut.length === 0 ? (
-            <p className="px-7 py-12 text-center text-sm text-faint">Nothing spent {phrase}.</p>
+            <p className={`${cardPadX} py-12 text-center text-sm text-faint`}>Nothing spent {phrase}.</p>
           ) : (
-            <div className="flex flex-col items-center gap-6 px-7 sm:flex-row sm:items-center lg:flex-col xl:flex-row">
+            <div className={`flex flex-col items-center gap-6 sm:flex-row sm:items-center lg:flex-col xl:flex-row ${cardPadX}`}>
               <div className="relative h-[196px] w-[196px] shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -183,7 +183,7 @@ export default function DashboardPage() {
             </div>
           )}
           {breakdown === 'tag' && data.multiTagCount > 0 && (
-            <p className="px-7 pt-4 text-[11px] text-faint">
+            <p className={`${cardPadX} pt-4 text-[11px] text-faint`}>
               {data.multiTagCount} transaction{data.multiTagCount === 1 ? '' : 's'} in this window carr
               {data.multiTagCount === 1 ? 'ies' : 'y'} more than one tag, so these slices overlap.
             </p>

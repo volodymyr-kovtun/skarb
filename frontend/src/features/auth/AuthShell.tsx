@@ -13,7 +13,7 @@ export function AuthShell({ title, subtitle, children, footer, wide = false }: {
   wide?: boolean
 }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-paper px-6 py-12">
+    <div className="flex min-h-screen items-center justify-center bg-paper px-4 py-12 sm:px-6">
       <div className={`w-full ${wide ? 'max-w-md' : 'max-w-sm'}`}>
         <header className="mb-8 flex flex-col items-center gap-4">
           <Mark />
@@ -23,7 +23,7 @@ export function AuthShell({ title, subtitle, children, footer, wide = false }: {
           </div>
         </header>
 
-        <div className="rounded-card bg-surface p-7 shadow-card">{children}</div>
+        <div className="rounded-card bg-surface p-5 shadow-card sm:p-7">{children}</div>
 
         {footer && <div className="mt-5 text-center text-xs leading-relaxed text-faint">{footer}</div>}
       </div>

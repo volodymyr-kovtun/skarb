@@ -108,6 +108,9 @@ and proxies `/api` to the backend, so nothing has to be rebuilt at all.
 
 ## On your phone
 
+The web app is built for one too: on a phone the five sections become a bottom tab bar and the
+pages tighten to the screen, so a mobile browser is a first-class way to use Skarb.
+
 [`ios/`](ios/README.md) is a native SwiftUI client for the same API — the same sign-in, the
 same session cookie, the same endpoints, so the two clients can't disagree about what your
 money did. It mirrors the web's five pages as five tabs, in Skarb's palette and Apple's

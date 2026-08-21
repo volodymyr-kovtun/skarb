@@ -66,6 +66,9 @@
 }
 
 @theme inline {
+  /* Below this a phone can't spare the width for a word next to an icon. */
+  --breakpoint-xs: 22rem;
+
   --color-paper: var(--sk-paper);
   --color-surface: var(--sk-surface);
   --color-surface2: var(--sk-surface2);

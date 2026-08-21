@@ -211,3 +211,81 @@ remove-and-reconnect. Rotating the key is an N-place edit for the same reason.
   would read tidily on the Accounts page, which already groups by connection —
   but status, consent expiry, sync errors and full re-sync are all per bank and
   all currently connection-level. Probably no; worth writing down why.
+
+---
+
+## Add a transaction from the Telegram bot
+
+**What.** Message the bot `12.50 coffee` and it becomes a transaction on the cash
+account, categorized, with a reply that lets you fix the category or undo it. The
+bot stops being a one-way loudspeaker and starts taking input.
+
+**Why.** Cash is the hole in an otherwise automatic ledger. Everything else
+arrives on its own — sync, the Monobank webhook, a CSV — but money that never
+touches a bank feed has to be typed in: open the app, find Transactions, fill the
+form. That is more work than the purchase was, so it doesn't happen, the manual
+account's balance drifts from the cash actually in the pocket, and the spending
+figures quietly run low without ever looking wrong.
+
+The bot is already the right instrument for it. It is installed, it is trusted
+enough to carry balance alerts ([ALERTS.md](ALERTS.md)), and the phone is already
+in hand at the till. Two seconds of typing beats a form every time.
+
+**How, roughly.**
+
+- **Getting messages in.** The bot only speaks outward today; the single inbound
+  call is `getUpdates` in `TelegramApiClient.GetRecentChatsAsync`, used to
+  populate the chat picker. There are two ways to receive, and Telegram makes
+  them mutually exclusive: `setWebhook` pointed at an anonymous endpoint next to
+  the Monobank one, or long polling from a `BackgroundService` alongside
+  `BackgroundSyncService`. Note the trap — **setting a webhook makes `getUpdates`
+  fail**, so choosing it means rebuilding chat discovery on top of the webhook.
+  Long polling needs no public URL and so also works under `make dev`, at the cost
+  of a connection held open — but it does not save the picker either: whoever
+  consumes updates confirms them by offset, and the next `getUpdates` returns an
+  empty list. Either way, discovery becomes "chats the consumer has seen".
+- **Who may write.** The webhook precedent guards on an unguessable path, which
+  is fine for a payload that only reflects a bank the owner already linked. This
+  one *creates ledger rows*, and anyone can find a bot by its username and start
+  messaging it. So: an explicit allow-list of chat ids, and every other chat gets
+  a flat "not for you" and writes nothing.
+- **Parsing.** `12.50 coffee` is amount plus description; a leading `+` marks
+  income, spending is the default; currency comes from the target account.
+  Everything the message doesn't say is left to `ICategorizer` — keyword rules
+  are exactly good at `żabka`. Optional `#tag` and an explicit category name for
+  when the guess needs overriding.
+- **Where it lands.** One default account, chosen once, realistically the manual
+  cash account — `ManualAccountBalance.RecomputeAsync` already keeps a manual
+  account's balance as the sum of its rows, so a bot-added row keeps it honest.
+- **Writing it.** `POST /api/transactions` hand-rolls the insert today, with its
+  own categorizer probe, rather than going through `ITransactionIngestor` the way
+  every synced source does. A second caller is the moment to lift that into one
+  service both use, instead of a copy that will drift.
+- **The reply is the feature.** Inline buttons for the likeliest categories and an
+  undo that removes the row. A wrong guess that takes one tap to fix is what makes
+  the thing trustworthy enough to keep using.
+- [ALERTS.md](ALERTS.md) becomes the bot's document rather than the alerts
+  document, and the Settings copy that describes an alerts-only bot changes with it.
+
+**Open questions.**
+
+- Long poll or webhook. The `getUpdates` conflict above mostly decides it, but the
+  deployment side matters too: one container, restarted on every deploy. A poller
+  must resume on its stored offset so a restart doesn't drop or replay a day's
+  messages.
+- What stops a double entry? A redelivery or a restart replaying an update turns
+  one coffee into two, and unlike a bank row there is no external id to dedupe on.
+  Telegram's `update_id` is the obvious key, which means storing it — the same job
+  `StableId.From` plus the ingestor's `(AccountId, ExternalId)` check already do
+  for banks.
+- Should the bot also *answer* — balance, spent this month? It is nearly free once
+  messages arrive, and probably the more-used half. But it puts money figures into
+  a chat that can be forwarded, screenshotted or read over a shoulder, which is a
+  different risk from an alert saying an account is low. Decide it deliberately.
+- A photo of a receipt is the obvious next request and a completely different
+  problem — OCR, an external service, an amount that might be wrong. Worth saying
+  out loud that it is not in this entry.
+- [Family support](#family-support) would put several people in front of one bot.
+  Whose money is an unattributed `12.50 coffee`? No need to answer now, but the
+  allow-list should be a list of chat ids from the first version, so answering it
+  later is a change and not a rewrite.

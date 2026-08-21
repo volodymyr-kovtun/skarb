@@ -6,6 +6,17 @@ All notable changes to Skarb are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- **Skarb for iPhone** ([ios/](ios/README.md)) — a native SwiftUI client on the same API,
+  with the same password + TOTP sign-in and the same `skarb.session` cookie, so nothing is
+  duplicated server-side. The web's five pages become five tabs behind an iOS 26 Liquid Glass
+  tab bar: the overview (net worth, currency switcher, report window, the spending ring by
+  category / account / tag, cashflow, accounts by institution, recent activity), the
+  transaction list with every filter and the rule offer that follows a hand-made category
+  change, the account editor including low-balance Telegram alerts, categories / tags / rules,
+  and settings (connections, Monobank connect, notifications, security, appearance, server
+  address). The palette and the per-theme color band are ported from `index.css` and
+  `color.ts` rather than re-picked, so the two clients can only drift on purpose. Enable
+  Banking onboarding and CSV import deliberately stay on the web, and the app points there.
 - Initial public release.
 - **Authentication.** Single-owner sign-in with password (PBKDF2-HMAC-SHA512) and mandatory
   TOTP two-factor, plus eight single-use recovery codes. First-run setup is gated by a setup

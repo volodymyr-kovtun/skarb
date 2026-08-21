@@ -14,6 +14,7 @@ Built for a PKO BP + ZEN + Monobank setup, but works with 2,500+ European banks.
 | Backend | .NET 10, ASP.NET Core minimal APIs, vertical-slice architecture, EF Core + PostgreSQL |
 | Frontend | React 19, TypeScript, Vite, Tailwind CSS 4, Recharts, TanStack Query |
 | Storage | PostgreSQL 17 (bundled `docker-compose.yml`) — your data never leaves your machine |
+| iOS | Swift 6, SwiftUI, Swift Charts — a native iPhone client on the same API ([ios/](ios/)) |
 
 ## Features
 
@@ -105,6 +106,18 @@ and proxies `/api` to the backend, so nothing has to be rebuilt at all.
   After changing entities: `make migrate NAME=<Name>` and restart.
 - Full reset: `make deps-reset`.
 
+## On your phone
+
+[`ios/`](ios/README.md) is a native SwiftUI client for the same API — the same sign-in, the
+same session cookie, the same endpoints, so the two clients can't disagree about what your
+money did. It mirrors the web's five pages as five tabs, in Skarb's palette and Apple's
+Liquid Glass chrome, and needs iOS 26. Open `ios/Skarb.xcodeproj` and run; point it at your
+instance from **Settings → Server**. [ios/TESTFLIGHT.md](ios/TESTFLIGHT.md) covers getting it
+onto a phone — the free seven-day route, and the Apple Developer Program plus TestFlight.
+
+Linking a bank through Enable Banking and importing a CSV stay on the web — both are one-time
+desktop errands, and the app says so rather than pretending otherwise.
+
 ## Connecting your banks
 
 **Read [docs/BANKS.md](docs/BANKS.md)** — step-by-step for Monobank (token + instant webhook),
@@ -137,6 +150,10 @@ backend/Skarb.Api/
 frontend/src/
   shared/             typed api client, UI primitives, Layout
   features/           dashboard/ transactions/ accounts/ categories/ settings/
+ios/Skarb/
+  Core/               typed api client, models, app state, formatting
+  Design/             the palette and color band, ported from index.css / color.ts
+  Features/           auth/ overview/ transactions/ accounts/ categories/ settings/
 ```
 
 Key seams:

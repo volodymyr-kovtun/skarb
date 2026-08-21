@@ -1,0 +1,5 @@
+# Overlay that swaps the local build for the image GitHub Actions pushed to GHCR.
+services:
+  app:
+    image: ghcr.io/${GHCR_REPOSITORY:?set GHCR_REPOSITORY}/app:${IMAGE_TAG:-production}
+    build: null

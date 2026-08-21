@@ -1,0 +1,12 @@
+**/bin
+**/obj
+**/node_modules
+backend/Skarb.Api/wwwroot
+backend/Skarb.Api/keys
+.secrets
+.git
+.idea
+.vs
+.claude
+docs
+**/.DS_Store

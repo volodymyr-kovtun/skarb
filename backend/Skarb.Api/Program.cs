@@ -71,10 +71,16 @@ using (var scope = app.Services.CreateScope())
 
 // Behind a reverse proxy (Caddy, nginx, Cloudflare) the app only learns the request was
 // HTTPS from these headers — without them "Secure" cookies never get set.
-app.UseForwardedHeaders(new ForwardedHeadersOptions
+// Only a loopback proxy is trusted out of the box. A containerised proxy (Caddy on a
+// shared Docker network) connects from its bridge address instead, so the networks it
+// may speak for are configurable: ForwardedHeaders__KnownNetworks__0=172.16.0.0/12.
+var forwardedHeaders = new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
-});
+};
+foreach (var network in app.Configuration.GetSection("ForwardedHeaders:KnownNetworks").Get<string[]>() ?? [])
+    forwardedHeaders.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(network));
+app.UseForwardedHeaders(forwardedHeaders);
 
 // Bank/provider failures are expected operational errors (bad redirect URI, expired
 // consent, rate limit) — surface their message to the UI instead of a bare 500.

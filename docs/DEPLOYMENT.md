@@ -7,6 +7,15 @@ and anyone who can reach the URL is one bug away from all of it.
 This guide covers what changes when you deploy, and the one licensing question that
 catches people out.
 
+> **The short version:** the repo ships a ready-made production setup — a single Docker
+> image ([docker/Dockerfile](../docker/Dockerfile)) with the SPA baked in,
+> [compose.production.yml](../compose.production.yml) (app + PostgreSQL + daily dump
+> backups), and a manual deploy workflow
+> ([.github/workflows/manual-deploy.yml](../.github/workflows/manual-deploy.yml)) that
+> builds the image, pushes it to GHCR and rolls it out over SSH. Copy
+> [.env.production.example](../.env.production.example) to `.env.production` on the
+> server and fill it in. The sections below explain what that stack already handles.
+
 ---
 
 ## 1. Can I even deploy this? (Enable Banking, free tier)
@@ -93,6 +102,7 @@ environment variables, which is what you want in a container.
 | `Auth__SessionDays` | How long a session lasts (default 14, sliding). |
 | `Auth__MaxFailedAttempts` / `Auth__LockoutMinutes` | Lockout policy (default 5 attempts → 15 minutes). |
 | `Auth__AllowedOrigins__0` | Only needed if you serve the SPA from a different origin than the API. |
+| `ForwardedHeaders__KnownNetworks__0` | CIDR of the network your reverse proxy connects from. Only loopback proxies are trusted by default; a proxy in a container (Caddy on a Docker network) needs its bridge range here, e.g. `172.16.0.0/12` — otherwise `X-Forwarded-Proto` is ignored and Secure cookies are never issued. |
 | `Sync__StartDate` | The day your ledger opens, e.g. `2026-08-01`. Nothing dated earlier is ever synced or imported. Unset means no cutoff. |
 | `ASPNETCORE_ENVIRONMENT` | Must **not** be `Development` in production — that is what switches cookies to `Secure`-always and stops unexpected exception messages reaching the client. |
 
@@ -131,9 +141,9 @@ skarb.example.com {
 Caddy sets `X-Forwarded-Proto` and `X-Forwarded-For` by default. For nginx, set them
 explicitly.
 
-If your proxy is not on the same host as the app, also configure
-`ForwardedHeadersOptions.KnownProxies` — otherwise ASP.NET ignores headers from an
-untrusted hop.
+If the proxy does not connect from loopback — a proxy in another container, or on
+another host — set `ForwardedHeaders__KnownNetworks__0` to the network it connects
+from (see the table above), otherwise ASP.NET ignores headers from an untrusted hop.
 
 ---
 

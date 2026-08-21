@@ -16,6 +16,9 @@ dist/
 # Local-only secrets (account recovery codes, tokens) — stays on this machine
 .secrets/
 
+# Production env file lives on the server, never in the repo (.env.production.example is the template)
+.env.production
+
 # Data-protection key ring (encrypts the session cookie)
 keys/
 backend/Skarb.Api/keys/

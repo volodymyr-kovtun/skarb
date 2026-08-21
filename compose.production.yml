@@ -1,0 +1,121 @@
+# Production stack. Pair with compose.ghcr.yml to run prebuilt images:
+#
+#   docker compose --project-name skarb --env-file .env.production \
+#     -f compose.production.yml -f compose.ghcr.yml up -d
+#
+# The app joins the droplet's shared `web` network as `skarb-app`; the shared Caddy
+# proxy terminates TLS and forwards skarb.subero.app traffic there. See .env.production.example
+# for the variables this file expects.
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-skarb}
+      POSTGRES_USER: ${POSTGRES_USER:-skarb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-skarb} -d ${POSTGRES_DB:-skarb}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *default-logging
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Default: Host=postgres;Port=5432;Database=${POSTGRES_DB:-skarb};Username=${POSTGRES_USER:-skarb};Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      # Key ring lives on a volume: losing it signs every session out on restart.
+      Auth__KeyRingPath: /keys
+      # Empty means Skarb generates a token and prints it to the log on first boot.
+      Auth__SetupToken: ${AUTH_SETUP_TOKEN:-}
+      # Ledger opening day (optional, e.g. 2026-08-01). Empty = no cutoff.
+      Sync__StartDate: ${SYNC_START_DATE:-}
+      # The shared Caddy proxy connects from the Docker bridge pool; without this the
+      # app ignores X-Forwarded-Proto and Secure cookies are never issued.
+      ForwardedHeaders__KnownNetworks__0: ${FORWARDED_HEADERS_NETWORK:-172.16.0.0/12}
+    volumes:
+      - keys:/keys
+    expose:
+      - "8080"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+    logging: *default-logging
+    networks:
+      default:
+      web:
+        aliases:
+          - skarb-app
+
+  # Daily encrypted-at-rest-worthy dumps: the database holds live bank tokens and the
+  # full ledger, so it IS the app. Retention-pruned pg_dump into a named volume.
+  postgres-backup:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-skarb}
+      POSTGRES_USER: ${POSTGRES_USER:-skarb}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - postgres-backups:/backups
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        while true; do
+          timestamp="$$(date -u +%Y%m%dT%H%M%SZ)"
+          backup_file="/backups/skarb-$${timestamp}.sql.gz"
+          echo "creating backup: $${backup_file}"
+          pg_dump --clean --if-exists --no-owner --no-privileges -h postgres -U "$${POSTGRES_USER}" "$${POSTGRES_DB}" | gzip > "$${backup_file}"
+          find /backups -type f -name "*.sql.gz" -mtime +"$${BACKUP_RETENTION_DAYS}" -delete
+          sleep "$${BACKUP_INTERVAL_SECONDS}"
+        done
+    healthcheck:
+      test: ["CMD-SHELL", "ls /backups/*.sql.gz >/dev/null 2>&1"]
+      interval: 1m
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+
+networks:
+  default:
+  web:
+    external: true
+
+volumes:
+  postgres-data:
+  postgres-backups:
+  keys:

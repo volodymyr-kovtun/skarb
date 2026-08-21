@@ -144,3 +144,70 @@ bank's number, and the ledger is worth more when it matches the statement.
 - Where does it stop? Tracking what each person owes you over time is Splitwise's job.
   The line worth holding is that Skarb reports **your** money honestly — it is not a
   ledger of other people's debts.
+
+---
+
+## One Enable Banking application, many banks
+
+**What.** The Enable Banking application — its ID and its RSA private key — is
+entered once and then reused. Connecting another bank becomes: pick the bank,
+authorize, done. Registering a second application stays possible, for the case
+where it really is a second registration.
+
+**Why.** Two different things share one row today. The `SettingsJson` of an
+`enablebanking` connection holds `applicationId` and `privateKeyPem` — the
+credential, one per Enable Banking registration — right next to `sessionId`,
+`aspspName` and `validUntil`, which are the consent for *one* bank. A connection
+can only carry one consent, so a second bank means a second connection, and a
+second connection asks for the application ID and the whole PEM key again.
+
+That is backwards from how the accounts were actually set up: you register the
+application once in Enable Banking's portal and link every account you own under
+it. Skarb then makes you re-paste the credential per bank instead of reusing the
+one you already gave it. The private key is the most sensitive value the instance
+stores, and the design asks for another copy of it every time — including every
+90 days, when the consent expires and there is no re-authorize button, only
+remove-and-reconnect. Rotating the key is an N-place edit for the same reason.
+
+**How, roughly.**
+
+- Lift the credential into its own small table — a name, the application ID, the
+  key — and leave the consent fields on `BankConnection` with a reference to it.
+  `EnableBankingSettings.From(conn)` is the single place that assembles the two
+  halves today, so the provider and the API client, which both take a settings
+  object, barely move.
+- A data migration folds the existing rows: one application row per distinct
+  `applicationId`, connections repointed at it, the key dropped from their
+  settings. Realistically there is exactly one, but the key must not be left
+  duplicated in two places once the new one exists.
+- The connect flow in Settings splits in two. "Connect a bank" goes straight to
+  the bank picker when an application is already registered; the credential modal
+  moves behind a "register another application" link that most connections never
+  touch. The ASPSP list and the authorize/complete round trip stay as they are.
+- `/api/connections/enablebanking` stops doing both jobs: it takes an application
+  reference plus a display name, and the credential gets its own endpoints —
+  including replacing the key in one place.
+- With the key no longer welded to a single consent, re-authorizing an expired
+  bank becomes a button on the connection rather than a delete and rebuild.
+  Worth doing in the same change: removing a connection today also deletes its
+  accounts and every transaction on them, which is a steep price for a consent
+  that merely aged out.
+
+**Open questions.**
+
+- Is more than one application worth supporting at all? The free tier reaches
+  only the accounts you linked in their portal ([DEPLOYMENT.md](DEPLOYMENT.md)),
+  and they all hang off one registration, so the second application is a
+  sandbox-versus-production thing more than a real case. One instance-wide row is
+  simpler — and is also the kind of assumption that is unpleasant to undo later.
+- Where does the credential live in the UI? Per-entity config belongs to the
+  entity, but a key shared by every connection is instance-wide plumbing, which
+  is what the Settings page is for. Probably a small block above the connection
+  list, invisible until it needs attention.
+- Deleting the last connection that used an application: keep the credential or
+  drop it? Keeping it makes the next bank one click. It also leaves a private key
+  sitting there with nothing using it.
+- Should one connection hold several banks instead, one row per application? It
+  would read tidily on the Accounts page, which already groups by connection —
+  but status, consent expiry, sync errors and full re-sync are all per bank and
+  all currently connection-level. Probably no; worth writing down why.

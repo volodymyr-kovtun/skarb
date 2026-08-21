@@ -39,10 +39,17 @@ export function Card({ children, className = '' }: { children: ReactNode; classN
   return <section className={`rounded-card bg-surface shadow-card ${className}`}>{children}</section>
 }
 
-export function CardHeader({ title, action }: { title: string; action?: ReactNode }) {
+export function CardHeader({ title, subtitle, action }:
+  { title: string; subtitle?: string; action?: ReactNode }) {
   return (
-    <header className="flex items-center justify-between gap-4 px-7 pt-6 pb-3">
-      <h2 className={sectionTitleCls}>{title}</h2>
+    // Wraps rather than squeezing: on a phone a title, a date and a three-way switch do not
+    // share one line, and the casualty was always the range this header exists to state.
+    <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-7 pt-6 pb-3">
+      <div className="min-w-0">
+        <h2 className={sectionTitleCls}>{title}</h2>
+        {/* Where a card counts from — said out loud, because no two cards here count the same days. */}
+        {subtitle && <p className="mt-0.5 truncate text-[12px] text-faint">{subtitle}</p>}
+      </div>
       {action}
     </header>
   )
@@ -56,13 +63,16 @@ export function Segmented({ value, options, onChange, label, title }:
   { value: string; options: { value: string; label: string }[]; onChange: (v: string) => void; label: string; title?: string }) {
   if (options.length < 2) return null
   return (
-    <div className="flex items-center gap-0.5 rounded-full bg-surface2 p-1" role="group" aria-label={label} title={title}>
+    <div className="flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full bg-surface2 p-1"
+      role="group" aria-label={label} title={title}>
       {options.map((o) => (
         <button
           key={o.value}
           onClick={() => onChange(o.value)}
           aria-pressed={value === o.value}
-          className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+          // Two-word options ("Last month") break across lines on a narrow phone otherwise;
+          // the row scrolls instead of folding, which keeps every pill one line high.
+          className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
             value === o.value ? 'bg-surface text-ink shadow-card' : 'text-muted hover:text-ink'}`}
         >
           {o.label}

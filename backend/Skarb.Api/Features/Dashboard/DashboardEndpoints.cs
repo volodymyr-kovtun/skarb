@@ -11,15 +11,20 @@ public class DashboardEndpoints : IEndpointGroup
 {
     public void Map(IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/dashboard", async (SkarbDbContext db, IExchangeRateService fx, string? currency, int months = 6) =>
+        app.MapGet("/api/dashboard", async (
+            SkarbDbContext db, IExchangeRateService fx, string? currency, string? period, int months = 6) =>
         {
             var now = DateTime.UtcNow;
             var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-            var prevMonthStart = monthStart.AddMonths(-1);
-            // The window always covers the previous month too, so the summary tiles
-            // can read from the same per-month totals as the chart.
-            var windowStart = monthStart.AddMonths(-Math.Max(months - 1, 1));
-            var chartStart = monthStart.AddMonths(-(months - 1));
+            // One window scopes the whole page: the tiles, the comparison under them, and every
+            // spending breakdown. Anything that ignores it says so on its own face.
+            var window = ReportPeriod.Resolve(period, now);
+
+            // The chart is context around that window rather than the window itself. It always runs
+            // to this month so the net-worth line can be walked back from today's balance, and never
+            // covers fewer months than the window does.
+            var chartMonths = Math.Max(window.MonthSpan, Math.Max(months, 2));
+            var chartStart = monthStart.AddMonths(-(chartMonths - 1));
 
             // Everything on this page is reported in one currency of the reader's choosing;
             // an unknown or missing request falls back to the configured base.
@@ -39,11 +44,42 @@ public class DashboardEndpoints : IEndpointGroup
                 accountDtos.Add(new { account = a.ToDto(), balanceConverted = converted });
             }
 
-            // Money flows grouped in SQL by month + currency + direction + investment-ness.
+            // Earned, spent and invested over one half-open stretch of time. The selected window and
+            // the stretch it is compared against both cut across whole months — a month-to-date one
+            // by definition — so neither can be read off the chart's per-month buckets below.
             // Internal transfers and manually excluded transactions never count.
+            async Task<(decimal Income, decimal Expense, decimal Invested)> TotalsAsync(DateTime from, DateTime to)
+            {
+                var rows = await db.Transactions
+                    .OnCountedAccounts()
+                    .Where(t => !t.IsExcluded && !t.IsInternal && t.OccurredAt >= from && t.OccurredAt < to)
+                    .GroupBy(t => new
+                    {
+                        t.Currency,
+                        IsIncome = t.Amount > 0,
+                        IsInvestment = t.Category != null && t.Category.Kind == CategoryKinds.Investment,
+                    })
+                    .Select(g => new { g.Key.Currency, g.Key.IsIncome, g.Key.IsInvestment, Sum = g.Sum(t => t.Amount) })
+                    .ToListAsync();
+
+                decimal income = 0, expense = 0, invested = 0;
+                foreach (var row in rows)
+                {
+                    var v = await fx.ConvertAsync(Math.Abs(row.Sum), row.Currency, display);
+                    if (row.IsInvestment) invested += row.IsIncome ? -v : v; // withdrawals reduce invested
+                    else if (row.IsIncome) income += v;
+                    else expense += v;
+                }
+                return (Math.Round(income, 2), Math.Round(expense, 2), Math.Round(invested, 2));
+            }
+
+            var totals = await TotalsAsync(window.Start, window.End);
+            var previous = await TotalsAsync(window.PreviousStart, window.PreviousEnd);
+
+            // The chart's own numbers, grouped in SQL by month + currency + direction + investment-ness.
             var flowRows = await db.Transactions
                 .OnCountedAccounts()
-                .Where(t => !t.IsExcluded && !t.IsInternal && t.OccurredAt >= windowStart)
+                .Where(t => !t.IsExcluded && !t.IsInternal && t.OccurredAt >= chartStart)
                 .GroupBy(t => new
                 {
                     t.OccurredAt.Year,
@@ -59,33 +95,28 @@ public class DashboardEndpoints : IEndpointGroup
                 })
                 .ToListAsync();
 
-            // One conversion pass per month in the window; tiles and chart read the same numbers.
-            var totalsByMonth = new Dictionary<DateTime, (decimal Income, decimal Expense, decimal Invested)>();
-            for (var d = windowStart; d <= monthStart; d = d.AddMonths(1))
+            var cashflow = new List<object>();
+            for (var m = 0; m < chartMonths; m++)
             {
+                var d = chartStart.AddMonths(m);
                 decimal income = 0, expense = 0, invested = 0;
                 foreach (var row in flowRows.Where(r => r.Year == d.Year && r.Month == d.Month))
                 {
                     var v = await fx.ConvertAsync(Math.Abs(row.Sum), row.Currency, display);
-                    if (row.IsInvestment) invested += row.IsIncome ? -v : v; // withdrawals reduce invested
+                    if (row.IsInvestment) invested += row.IsIncome ? -v : v;
                     else if (row.IsIncome) income += v;
                     else expense += v;
                 }
-                totalsByMonth[d] = (Math.Round(income, 2), Math.Round(expense, 2), Math.Round(invested, 2));
+                cashflow.Add(new
+                {
+                    month = d.ToString("yyyy-MM"),
+                    income = Math.Round(income, 2),
+                    expense = Math.Round(expense, 2),
+                    invested = Math.Round(invested, 2),
+                });
             }
 
-            var cashflow = new List<object>();
-            for (var m = 0; m < months; m++)
-            {
-                var d = chartStart.AddMonths(m);
-                var t = totalsByMonth.GetValueOrDefault(d);
-                cashflow.Add(new { month = d.ToString("yyyy-MM"), income = t.Income, expense = t.Expense, invested = t.Invested });
-            }
-
-            var (curIncome, curExpense, curInvested) = totalsByMonth[monthStart];
-            var (prevIncome, prevExpense, prevInvested) = totalsByMonth[prevMonthStart];
-
-            // All-time net contributions to investment-kind categories.
+            // All-time net contributions to investment-kind categories — deliberately outside the window.
             var investedRows = await db.Transactions
                 .OnCountedAccounts()
                 .Where(t => !t.IsExcluded && !t.IsInternal &&
@@ -97,15 +128,16 @@ public class DashboardEndpoints : IEndpointGroup
             foreach (var row in investedRows)
                 allTimeInvested += await fx.ConvertAsync(-row.Sum, row.Currency, display); // outgoing = positive contribution
 
-            // Everything the month counts as spending — investments live in their own tile,
+            // Everything the window counts as spending — investments live in their own tile,
             // not here. All three breakdowns below read from this one definition.
-            var monthSpending = db.Transactions
+            var windowSpending = db.Transactions
                 .OnCountedAccounts()
-                .Where(t => !t.IsExcluded && !t.IsInternal && t.Amount < 0 && t.OccurredAt >= monthStart &&
+                .Where(t => !t.IsExcluded && !t.IsInternal && t.Amount < 0 &&
+                            t.OccurredAt >= window.Start && t.OccurredAt < window.End &&
                             (t.Category == null || t.Category.Kind != CategoryKinds.Investment));
 
-            // Spending by category, current month.
-            var catRows = await monthSpending
+            // Spending by category.
+            var catRows = await windowSpending
                 .GroupBy(t => new { t.CategoryId, t.Currency })
                 .Select(g => new { g.Key.CategoryId, g.Key.Currency, Sum = g.Sum(t => t.Amount) })
                 .ToListAsync();
@@ -133,9 +165,9 @@ public class DashboardEndpoints : IEndpointGroup
                 .OrderByDescending(x => x.amount)
                 .ToList();
 
-            // Spending by account, current month — the same money, cut by where it left from.
-            // Like categories, these partition the month — a transaction sits on exactly one account.
-            var accountRows = await monthSpending
+            // Spending by account — the same money, cut by where it left from.
+            // Like categories, these partition the window — a transaction sits on exactly one account.
+            var accountRows = await windowSpending
                 .GroupBy(t => new { t.AccountId, t.Currency })
                 .Select(g => new { g.Key.AccountId, g.Key.Currency, Sum = g.Sum(t => t.Amount) })
                 .ToListAsync();
@@ -161,10 +193,10 @@ public class DashboardEndpoints : IEndpointGroup
                 .OrderByDescending(x => x.amount)
                 .ToList();
 
-            // Spending by tag, current month. A transaction wearing two tags counts under both,
-            // so these do not partition the month the way categories do — multiTagCount says how
-            // often that actually happens, and the UI owns up to it when it does.
-            var tagRows = await monthSpending
+            // Spending by tag. A transaction wearing two tags counts under both, so these do not
+            // partition the window the way categories do — multiTagCount says how often that
+            // actually happens, and the UI owns up to it when it does.
+            var tagRows = await windowSpending
                 .SelectMany(t => t.Tags, (t, tag) => new { tag.Id, tag.Name, tag.Color, t.Currency, t.Amount })
                 .GroupBy(x => new { x.Id, x.Name, x.Color, x.Currency })
                 .Select(g => new { g.Key.Id, g.Key.Name, g.Key.Color, g.Key.Currency, Sum = g.Sum(x => x.Amount) })
@@ -182,7 +214,7 @@ public class DashboardEndpoints : IEndpointGroup
                 .ToList();
 
             // What carries no tag at all — the honest remainder next to the tags above.
-            var untaggedRows = await monthSpending
+            var untaggedRows = await windowSpending
                 .Where(t => !t.Tags.Any())
                 .GroupBy(t => t.Currency)
                 .Select(g => new { Currency = g.Key, Sum = g.Sum(t => t.Amount) })
@@ -191,7 +223,7 @@ public class DashboardEndpoints : IEndpointGroup
             foreach (var row in untaggedRows)
                 untaggedSpending += await fx.ConvertAsync(-row.Sum, row.Currency, display);
 
-            var multiTagCount = await monthSpending.CountAsync(t => t.Tags.Count > 1);
+            var multiTagCount = await windowSpending.CountAsync(t => t.Tags.Count > 1);
 
             var recent = await db.Transactions
                 .OnCountedAccounts()
@@ -206,14 +238,23 @@ public class DashboardEndpoints : IEndpointGroup
                 availableCurrencies = await DisplayCurrency.OptionsAsync(fx, accounts.Select(a => a.Currency)),
                 netWorth = Math.Round(netWorth, 2),
                 accounts = accountDtos,
-                month = new
+                // Both ends inclusive, so the UI can print the window exactly as it was counted.
+                period = new
                 {
-                    income = curIncome,
-                    expense = curExpense,
-                    invested = curInvested,
-                    net = Math.Round(curIncome - curExpense - curInvested, 2),
+                    key = window.Key,
+                    start = Iso(window.Start),
+                    end = Iso(window.End.AddDays(-1)),
+                    previousStart = Iso(window.PreviousStart),
+                    previousEnd = Iso(window.PreviousEnd.AddDays(-1)),
                 },
-                prevMonth = new { income = prevIncome, expense = prevExpense, invested = prevInvested },
+                totals = new
+                {
+                    income = totals.Income,
+                    expense = totals.Expense,
+                    invested = totals.Invested,
+                    net = Math.Round(totals.Income - totals.Expense - totals.Invested, 2),
+                },
+                previous = new { income = previous.Income, expense = previous.Expense, invested = previous.Invested },
                 allTimeInvested = Math.Round(allTimeInvested, 2),
                 spendingByCategory,
                 spendingByAccount,
@@ -225,4 +266,6 @@ public class DashboardEndpoints : IEndpointGroup
             };
         });
     }
+
+    private static string Iso(DateTime d) => d.ToString("yyyy-MM-dd");
 }

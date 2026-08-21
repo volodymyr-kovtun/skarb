@@ -1,3 +1,5 @@
+import type { PeriodKey } from './period'
+
 export type CategoryKind = 'expense' | 'income' | 'investment'
 export type Category = { id: string; name: string; emoji: string; color: string; kind: CategoryKind }
 export type CategoryWithCount = Category & { transactionCount: number }
@@ -30,17 +32,27 @@ export type Dashboard = {
   availableCurrencies: string[]
   netWorth: number
   accounts: { account: Account; balanceConverted: number }[]
-  month: { income: number; expense: number; invested: number; net: number }
-  prevMonth: { income: number; expense: number; invested: number }
+  /**
+   * The window every figure below is counted over, and the one it is measured against.
+   * All four dates are inclusive, so they can be printed exactly as they were counted.
+   */
+  period: { key: PeriodKey; start: string; end: string; previousStart: string; previousEnd: string }
+  totals: { income: number; expense: number; invested: number; net: number }
+  previous: { income: number; expense: number; invested: number }
+  /** Net contributions to investment categories over all time — deliberately outside the window. */
   allTimeInvested: number
   spendingByCategory: { categoryId: string | null; name: string; emoji: string; color: string; amount: number }[]
-  /** This month's spending cut by the account it left from. */
+  /** The window's spending cut by the account it left from. */
   spendingByAccount: { accountId: string; name: string; bank: string; color: string; amount: number }[]
   spendingByTag: { tagId: string; name: string; color: string; amount: number }[]
-  /** This month's spending carrying no tag at all. */
+  /** The window's spending carrying no tag at all. */
   untaggedSpending: number
-  /** Transactions this month wearing more than one tag — the reason tag slices can overlap. */
+  /** Transactions in the window wearing more than one tag — the reason tag slices can overlap. */
   multiTagCount: number
+  /**
+   * Per-month context around the window rather than the window itself: it always runs to the
+   * current month, so the net-worth line can be walked back from today's balance.
+   */
   cashflow: { month: string; income: number; expense: number; invested: number }[]
   recent: Tx[]
 }
@@ -135,8 +147,13 @@ export const api = {
   recoveryCodesLeft: () => get<{ remaining: number }>('/api/auth/recovery-codes/remaining'),
 
   meta: () => get<Meta>('/api/meta'),
-  dashboard: (currency?: string) =>
-    get<Dashboard>('/api/dashboard' + (currency ? `?currency=${currency}` : '')),
+  dashboard: (currency?: string, period?: PeriodKey) => {
+    const q = new URLSearchParams()
+    if (currency) q.set('currency', currency)
+    if (period) q.set('period', period)
+    const qs = q.toString()
+    return get<Dashboard>('/api/dashboard' + (qs ? `?${qs}` : ''))
+  },
 
   /** Array values are repeated (`tagIds=a&tagIds=b`), which is how the API reads a set. */
   transactions: (params: Record<string, string | string[]>) => {

@@ -69,7 +69,13 @@ public static class AuthenticationExtensions
                     ? path
                     : Path.Combine(environment.ContentRootPath, "keys")));
 
-        services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+        // Local development may hand the default scheme to a bypass that authenticates everyone.
+        // The cookie scheme stays registered either way, and sign-in/sign-out name it explicitly,
+        // so the real login flow still works while the bypass is on.
+        var bypass = DevAuthBypass.IsEnabled(environment);
+
+        var schemes = services
+            .AddAuthentication(bypass ? DevAuthBypass.SchemeName : CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(options =>
             {
                 options.Cookie.Name = CookieName;
@@ -101,6 +107,9 @@ public static class AuthenticationExtensions
                 };
                 options.Events.OnValidatePrincipal = ValidateSecurityStampAsync;
             });
+
+        if (bypass)
+            schemes.AddScheme<AuthenticationSchemeOptions, DevAuthBypassHandler>(DevAuthBypass.SchemeName, null);
 
         services.AddAuthorizationBuilder()
             .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());

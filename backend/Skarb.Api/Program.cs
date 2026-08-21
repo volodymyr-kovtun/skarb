@@ -61,6 +61,13 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
+// Loud on every start, because a bypass nobody can see in the log is one that gets forgotten.
+if (DevAuthBypass.IsEnabled(app.Environment))
+    app.Logger.LogWarning(
+        "AUTHENTICATION BYPASS ACTIVE — {Variable} is set and the host is in Development, so every " +
+        "request is treated as the signed-in owner. Do not expose this process to anything but localhost.",
+        DevAuthBypass.Variable);
+
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<SkarbDbContext>();

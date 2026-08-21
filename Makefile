@@ -61,6 +61,14 @@ dev: deps-up ## Dev mode: API on :5179/:5178 + Vite hot reload on :5173 (Ctrl+C 
 dev-api: deps-up ## Dev mode: backend only (https :5179, http :5178)
 	cd $(BACKEND_DIR) && dotnet run
 
+.PHONY: dev-noauth
+dev-noauth: deps-up ## Dev mode: backend with sign-in BYPASSED, for driving the UI locally
+	@echo ""
+	@echo "  !!  Authentication is OFF: every request is treated as the signed-in owner."
+	@echo "      Development only, localhost only. The API refuses to start this way otherwise."
+	@echo ""
+	cd $(BACKEND_DIR) && ASPNETCORE_ENVIRONMENT=Development SKARB_DEV_AUTH_BYPASS=true dotnet run
+
 .PHONY: dev-web
 dev-web: ## Dev mode: frontend only (:5173, expects API on :5178)
 	cd $(FRONTEND_DIR) && npm run dev

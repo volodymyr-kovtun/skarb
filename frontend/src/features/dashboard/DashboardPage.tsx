@@ -11,6 +11,9 @@ import {
   Card, CardHeader, CurrencySwitch, Segmented, TxRow, labelCls, quietLinkCls,
 } from '../../shared/ui'
 import { useDisplayCurrency } from '../../shared/currency'
+import {
+  PERIODS, formatRange, periodComparison, periodName, periodPhrase, useReportPeriod,
+} from '../../shared/period'
 import { useChartColors, useIsDark } from '../../shared/theme'
 import { swatch } from '../../shared/color'
 import AccountsCard from './AccountsCard'
@@ -22,13 +25,14 @@ type Slice = { key: string; name: string; color: string; amount: number; href?: 
 
 export default function DashboardPage() {
   const [currency, pickCurrency] = useDisplayCurrency()
+  const [period, pickPeriod] = useReportPeriod()
   const [breakdown, setBreakdown] = useState<Breakdown>('category')
   const c = useChartColors()
   const dark = useIsDark()
   const { data, isLoading } = useQuery({
-    queryKey: ['dashboard', currency],
-    queryFn: () => api.dashboard(currency || undefined),
-    // Keep the previous currency on screen while the next one loads — switching
+    queryKey: ['dashboard', currency, period],
+    queryFn: () => api.dashboard(currency || undefined, period),
+    // Keep the previous currency and window on screen while the next one loads — switching
     // shouldn't blank the page.
     placeholderData: (prev) => prev,
   })
@@ -37,7 +41,14 @@ export default function DashboardPage() {
 
   const cur = data.currency
   const flow = data.cashflow.map((m) => ({ ...m, label: format(parseISO(m.month + '-01'), 'MMM') }))
-  const monthDelta = data.month.net
+  const net = data.totals.net
+  // Every label below reads off the window the server answered for, not the pill that was
+  // clicked. While a switch is in flight the old figures are still on screen, and they should
+  // keep the name they were counted under.
+  const shown = data.period.key
+  const range = formatRange(data.period.start, data.period.end)
+  const comparedWith = `Measured against ${formatRange(data.period.previousStart, data.period.previousEnd)}`
+  const phrase = periodPhrase[shown]
 
   const categorySlices: Slice[] = data.spendingByCategory.map((s) => ({
     key: s.categoryId ?? 'uncategorized', name: s.name, color: s.color, amount: s.amount,
@@ -76,12 +87,12 @@ export default function DashboardPage() {
             {fmtMoney(data.netWorth, cur)}
           </h1>
           <p className="mt-4 max-w-md text-[15px] leading-relaxed text-muted">
-            {monthDelta === 0 ? 'Flat this month.' : (
+            {net === 0 ? `Flat ${phrase}.` : (
               <>
-                <span className={monthDelta > 0 ? 'font-bold text-income' : 'font-bold text-ink'}>
-                  {fmtMoney(monthDelta, cur, { sign: true })}
+                <span className={net > 0 ? 'font-bold text-income' : 'font-bold text-ink'}>
+                  {fmtMoney(net, cur, { sign: true })}
                 </span>{' '}
-                left this month, after everything you spent and invested.
+                left {phrase}, after everything you spent and invested.
               </>
             )}
           </p>
@@ -89,14 +100,32 @@ export default function DashboardPage() {
         <NetWorthTrend data={data} cur={cur} accent={c.invested} />
       </Card>
 
-      {/* Month tiles */}
+      {/* The window the tiles and the spending breakdown below are counted over, and the
+          control that moves it. The dates are spelled out because the pill alone doesn't say
+          whether "this month" means the whole of it. */}
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-1">
+        <div className="min-w-0">
+          <p className={labelCls}>{periodName[shown]}</p>
+          <p className="tnum mt-1.5 text-[13.5px] text-muted">{range}</p>
+        </div>
+        <Segmented
+          value={period}
+          options={PERIODS.map((o) => ({ value: o.value, label: o.label }))}
+          onChange={pickPeriod}
+          label="Report over"
+        />
+      </div>
+
+      {/* Window tiles */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-        <StatTile label="Earned" value={data.month.income} prev={data.prevMonth.income} cur={cur} tone="text-income" />
-        <StatTile label="Spent" value={data.month.expense} prev={data.prevMonth.expense} cur={cur} tone="text-spend" />
-        <StatTile label="Invested" value={data.month.invested} prev={data.prevMonth.invested} cur={cur} tone="text-accent"
+        <StatTile label="Earned" value={data.totals.income} prev={data.previous.income} cur={cur} tone="text-income"
+          compare={periodComparison[shown]} compareTitle={comparedWith} />
+        <StatTile label="Spent" value={data.totals.expense} prev={data.previous.expense} cur={cur} tone="text-spend"
+          compare={periodComparison[shown]} compareTitle={comparedWith} />
+        <StatTile label="Invested" value={data.totals.invested} prev={data.previous.invested} cur={cur} tone="text-accent"
           footer={`${fmtMoney(data.allTimeInvested, cur, { decimals: 0 })} all time`} />
-        <StatTile label="Net" value={data.month.net} cur={cur} signed
-          tone={data.month.net >= 0 ? 'text-income' : 'text-ink'} footer="after spending & investing" />
+        <StatTile label="Net" value={data.totals.net} cur={cur} signed
+          tone={data.totals.net >= 0 ? 'text-income' : 'text-ink'} footer="after spending & investing" />
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
@@ -104,6 +133,7 @@ export default function DashboardPage() {
         <Card className="pb-7 lg:col-span-2">
           <CardHeader
             title="Where it went"
+            subtitle={range}
             action={
               <Segmented
                 value={breakdown}
@@ -119,11 +149,11 @@ export default function DashboardPage() {
           />
           {nothingTagged ? (
             <p className="px-7 py-12 text-center text-sm text-faint">
-              Nothing tagged this month. Tags are free-form labels — open a{' '}
+              Nothing tagged {phrase}. Tags are free-form labels — open a{' '}
               <Link to="/transactions" className="font-semibold text-ink underline">transaction</Link> to add one.
             </p>
           ) : donut.length === 0 ? (
-            <p className="px-7 py-12 text-center text-sm text-faint">No spending yet this month.</p>
+            <p className="px-7 py-12 text-center text-sm text-faint">Nothing spent {phrase}.</p>
           ) : (
             <div className="flex flex-col items-center gap-6 px-7 sm:flex-row sm:items-center lg:flex-col xl:flex-row">
               <div className="relative h-[196px] w-[196px] shrink-0">
@@ -137,9 +167,9 @@ export default function DashboardPage() {
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-[11px] text-faint">This month</span>
+                  <span className="text-[11px] text-faint">{periodName[shown]}</span>
                   <span className="tnum mt-1 font-display text-[21px] font-semibold">
-                    {fmtMoney(data.month.expense, cur, { decimals: 0 })}
+                    {fmtMoney(data.totals.expense, cur, { decimals: 0 })}
                   </span>
                 </div>
               </div>
@@ -154,7 +184,7 @@ export default function DashboardPage() {
           )}
           {breakdown === 'tag' && data.multiTagCount > 0 && (
             <p className="px-7 pt-4 text-[11px] text-faint">
-              {data.multiTagCount} transaction{data.multiTagCount === 1 ? '' : 's'} carr
+              {data.multiTagCount} transaction{data.multiTagCount === 1 ? '' : 's'} in this window carr
               {data.multiTagCount === 1 ? 'ies' : 'y'} more than one tag, so these slices overlap.
             </p>
           )}
@@ -164,6 +194,7 @@ export default function DashboardPage() {
         <Card className="pb-5 lg:col-span-3">
           <CardHeader
             title="In and out"
+            subtitle={`Last ${flow.length} months, always up to today`}
             action={
               <span className="flex items-center gap-4 text-[12.5px] text-muted">
                 <span className="flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-income" /> Earned</span>
@@ -196,6 +227,7 @@ export default function DashboardPage() {
         <Card className="pb-5 lg:col-span-3">
           <CardHeader
             title="Recent activity"
+            subtitle={data.recent.length ? `Latest ${data.recent.length}, whenever they happened` : undefined}
             action={<Link to="/transactions" className={quietLinkCls}>See all</Link>}
           />
           <div className="px-4">
@@ -254,7 +286,7 @@ function NetWorthTrend({ data, cur, accent }: { data: import('../../shared/api')
         </ResponsiveContainer>
       </div>
       <p className="mt-1 text-center text-[11px] text-faint">
-        Traced back through six months of cashflow
+        Traced back through {months.length} months of cashflow
       </p>
     </div>
   )
@@ -284,8 +316,14 @@ function SliceRow({ slice, cur, dark }: { slice: Slice; cur: string; dark: boole
     : <span className={cls} title={title}>{body}</span>
 }
 
-function StatTile({ label, value, prev, cur, tone, footer, signed = false }:
-  { label: string; value: number; prev?: number; cur: string; tone: string; footer?: string; signed?: boolean }) {
+function StatTile({ label, value, prev, cur, tone, footer, compare, compareTitle, signed = false }: {
+  label: string; value: number; prev?: number; cur: string; tone: string; footer?: string
+  /** How the comparison window relates to this one — "on the same days last month". */
+  compare?: string
+  /** The comparison window's own dates, for anyone who wants them exactly. */
+  compareTitle?: string
+  signed?: boolean
+}) {
   const diff = prev !== undefined && prev > 0 ? ((value - prev) / prev) * 100 : null
   return (
     <Card className="px-6 py-6">
@@ -293,8 +331,12 @@ function StatTile({ label, value, prev, cur, tone, footer, signed = false }:
       <p className={`tnum mt-3 font-display text-[27px] font-semibold leading-none ${tone}`}>
         {fmtMoney(value, cur, { sign: signed })}
       </p>
-      <p className="mt-2.5 text-[13px] text-faint">
-        {footer ?? (diff === null ? 'no data last month' : `${diff >= 0 ? '+' : '−'}${Math.abs(diff).toFixed(0)}% on last month`)}
+      {/* The window behind this percentage runs exactly as long as the one above it, so a month
+          three weeks in is not read against a whole one and reported as a collapse. */}
+      <p className="mt-2.5 text-[13px] text-faint" title={footer ? undefined : compareTitle}>
+        {footer ?? (diff === null
+          ? 'nothing to compare with'
+          : `${diff >= 0 ? '+' : '−'}${Math.abs(diff).toFixed(0)}% ${compare}`)}
       </p>
     </Card>
   )

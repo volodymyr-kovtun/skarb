@@ -20,7 +20,9 @@ public partial class TransferDetector(SkarbDbContext db, IOptions<SyncOptions> o
 {
     public async Task<int> DetectAsync(CancellationToken ct)
     {
-        var pairWindow = TimeSpan.FromHours(options.Value.TransferPairWindowHours);
+        // Clamped so a typo'd Sync__TransferPairWindowHours can't overflow TimeSpan.FromHours
+        // and take detection down, nor quietly pair legs that are months apart.
+        var pairWindow = TimeSpan.FromHours(Math.Clamp(options.Value.TransferPairWindowHours, 0, 24 * 30));
         var cutoff = DateTime.UtcNow.AddDays(-options.Value.TransferLookbackDays);
         var marked = 0;
         var released = 0;

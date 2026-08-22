@@ -110,10 +110,42 @@ public class SyncService(IServiceScopeFactory scopeFactory, ILowBalanceAlerter a
 public class BackgroundSyncService(ISyncService sync, IOptions<SyncOptions> options, ILogger<BackgroundSyncService> logger)
     : BackgroundService
 {
+    /// <summary>Floor for the auto-sync interval. Mostly there to name the supported range in
+    /// the warning below — zero and negatives already mean "off" — and a minute is quicker than
+    /// a rate-limited Monobank round finishes anyway.</summary>
+    internal const int MinIntervalMinutes = 1;
+
+    /// <summary>Ceiling for the auto-sync interval. Task.Delay refuses anything past ~49 days,
+    /// and BackgroundServiceExceptionBehavior defaults to StopHost — so a typo'd
+    /// Sync__IntervalMinutes=100000 took the whole API down seconds after startup instead of
+    /// being rejected. A week is already far longer than any useful auto-sync period.</summary>
+    internal const int MaxIntervalMinutes = 7 * 24 * 60;
+
+    /// <summary>
+    /// The configured interval as a delay the timer can actually take. Zero or less keeps its
+    /// existing meaning — auto-sync off; anything else is clamped into the supported range
+    /// rather than trusted, because this value reaches Task.Delay on a background service.
+    /// </summary>
+    internal static TimeSpan ResolveInterval(int minutes) =>
+        minutes <= 0
+            ? TimeSpan.Zero
+            : TimeSpan.FromMinutes(Math.Clamp(minutes, MinIntervalMinutes, MaxIntervalMinutes));
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var interval = TimeSpan.FromMinutes(options.Value.IntervalMinutes);
-        if (interval <= TimeSpan.Zero) return;
+        var configured = options.Value.IntervalMinutes;
+        var interval = ResolveInterval(configured);
+        if (interval <= TimeSpan.Zero)
+        {
+            logger.LogInformation("Automatic sync is off (Sync:IntervalMinutes = {Minutes})", configured);
+            return;
+        }
+        if (interval.TotalMinutes != configured)
+        {
+            logger.LogWarning(
+                "Sync:IntervalMinutes is {Configured}, outside the supported {Min}-{Max} minute range; syncing every {Used} minutes instead",
+                configured, MinIntervalMinutes, MaxIntervalMinutes, interval.TotalMinutes);
+        }
 
         try
         {

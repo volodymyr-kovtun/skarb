@@ -90,7 +90,10 @@ public static class AuthenticationExtensions
                     ? CookieSecurePolicy.SameAsRequest
                     : CookieSecurePolicy.Always;
 
-                options.ExpireTimeSpan = TimeSpan.FromDays(Math.Max(1, auth.SessionDays));
+                // Clamped, not just floored: TimeSpan.FromDays overflows past ~10.6M days, and a
+                // typo'd Auth__SessionDays would then throw while building the cookie options —
+                // failing every request. A year is well past any sensible session lifetime.
+                options.ExpireTimeSpan = TimeSpan.FromDays(Math.Clamp(auth.SessionDays, 1, 365));
                 options.SlidingExpiration = true;
 
                 // This is an API behind an SPA: answer with status codes, never a redirect to

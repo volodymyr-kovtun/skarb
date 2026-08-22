@@ -162,7 +162,9 @@ no code changes needed.
 ## How syncing works inside Skarb
 
 - A background service syncs every linked connection every **hour**
-  (`Sync:IntervalMinutes` in `appsettings.json`; `0` disables it).
+  (`Sync:IntervalMinutes` in `appsettings.json`; `0` disables it). Anything outside
+  1 minute–7 days is clamped to the nearest end of that range and logged as a warning,
+  so a slipped digit costs you an odd sync period rather than the running app.
 - **`Sync:StartDate` is where the ledger opens** — unset by default, so out of the box you
   get whatever history each bank offers. Give it a date and nothing older ever enters Skarb:
   connectors stop asking their banks for it, and anything a bank volunteers anyway is dropped

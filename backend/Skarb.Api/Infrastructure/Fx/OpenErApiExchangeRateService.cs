@@ -17,7 +17,9 @@ public class OpenErApiExchangeRateService(
     private Dictionary<string, decimal> _rates = Fallback;
     private DateTime _fetchedAt = DateTime.MinValue;
     private readonly SemaphoreSlim _lock = new(1, 1);
-    private readonly TimeSpan _cacheFor = TimeSpan.FromHours(options.Value.CacheHours);
+    // Clamped because TimeSpan.FromHours overflows on a large enough typo, which would take
+    // the service down at construction. Zero still means "refetch on every lookup".
+    private readonly TimeSpan _cacheFor = TimeSpan.FromHours(Math.Clamp(options.Value.CacheHours, 0, 24 * 30));
 
     // Units of currency per 1 PLN (approximate fallback, refreshed from the API at runtime;
     // only meaningful while BaseCurrency is PLN — other bases rely on the live fetch).

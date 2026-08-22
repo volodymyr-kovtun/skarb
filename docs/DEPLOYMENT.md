@@ -99,7 +99,7 @@ environment variables, which is what you want in a container.
 | `ConnectionStrings__Default` | Point at your real database. **Change the default `skarb/skarb` password.** |
 | `Auth__SetupToken` | Choose your own first-run token instead of reading it from logs. |
 | `Auth__KeyRingPath` | **Mount this as a volume.** These keys encrypt the session cookie; if they vanish on restart, every session dies. Defaults to `<contentroot>/keys`. |
-| `Auth__SessionDays` | How long a session lasts (default 14, sliding). |
+| `Auth__SessionDays` | How long a session lasts (default 14, sliding; clamped to 1–365). |
 | `Auth__MaxFailedAttempts` / `Auth__LockoutMinutes` | Lockout policy (default 5 attempts → 15 minutes). |
 | `Auth__AllowedOrigins__0` | Only needed if you serve the SPA from a different origin than the API. |
 | `ForwardedHeaders__KnownNetworks__0` | CIDR of the network your reverse proxy connects from. Only loopback proxies are trusted by default; a proxy in a container (Caddy on a Docker network) needs its bridge range here, e.g. `172.16.0.0/12` — otherwise `X-Forwarded-Proto` is ignored and Secure cookies are never issued. |

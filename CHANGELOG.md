@@ -5,6 +5,16 @@ All notable changes to Skarb are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- **A typo in `Sync__IntervalMinutes` no longer takes the API down.** The value went straight
+  to `Task.Delay`, which rejects anything past ~49 days, and a background service that throws
+  stops the whole host by default — so `Sync__IntervalMinutes=100000` killed the app seconds
+  after startup with no obvious link back to the setting. The interval is now clamped to
+  1 minute–7 days and the out-of-range value is logged as a warning; `0` still means off.
+  The other durations read from configuration (`Auth__SessionDays`, `Fx__CacheHours`,
+  `Sync__TransferPairWindowHours`) are clamped the same way, since a large enough number
+  overflows `TimeSpan` on its own.
+
 ### Changed
 - **The web app on a phone.** The five sections used to be a row of header pills that wrapped
   onto two lines and claimed the top third of a phone screen before any money was on it. Below

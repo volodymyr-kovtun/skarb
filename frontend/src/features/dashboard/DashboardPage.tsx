@@ -8,8 +8,9 @@ import {
 } from 'recharts'
 import { accountLabel, api, fmtMoney } from '../../shared/api'
 import {
-  Card, CardHeader, CurrencySwitch, Segmented, TxRow, cardPadX, labelCls, quietLinkCls,
+  BalanceToggle, Card, CardHeader, CurrencySwitch, Segmented, TxRow, cardPadX, labelCls, quietLinkCls,
 } from '../../shared/ui'
+import { fmtBalance, useBalancesShown } from '../../shared/balances'
 import { useDisplayCurrency } from '../../shared/currency'
 import {
   PERIODS, formatRange, periodComparison, periodName, periodPhrase, useReportPeriod,
@@ -29,6 +30,7 @@ export default function DashboardPage() {
   const [breakdown, setBreakdown] = useState<Breakdown>('category')
   const c = useChartColors()
   const dark = useIsDark()
+  const showBalances = useBalancesShown()
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard', currency, period],
     queryFn: () => api.dashboard(currency || undefined, period),
@@ -81,10 +83,11 @@ export default function DashboardPage() {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <p className={labelCls}>Net worth</p>
+            <BalanceToggle />
             <CurrencySwitch value={cur} options={data.availableCurrencies} onChange={pickCurrency} />
           </div>
           <h1 className="tnum mt-3.5 font-display text-[44px] font-semibold leading-none tracking-[-0.03em] sm:text-[64px]">
-            {fmtMoney(data.netWorth, cur)}
+            {fmtBalance(showBalances, data.netWorth, cur)}
           </h1>
           <p className="mt-4 max-w-md text-[15px] leading-relaxed text-muted">
             {net === 0 ? `Flat ${phrase}.` : (
@@ -251,6 +254,9 @@ export default function DashboardPage() {
  * and out, not what holdings did on the market.
  */
 function NetWorthTrend({ data, cur, accent }: { data: import('../../shared/api').Dashboard; cur: string; accent: string }) {
+  // The curve stays drawn while balances are hidden: with no axis on it, the shape says how
+  // the months went without saying what they came to. Only the hovered figure is a balance.
+  const shown = useBalancesShown()
   const months = data.cashflow
   if (months.length < 2) return null
 
@@ -279,7 +285,7 @@ function NetWorthTrend({ data, cur, accent }: { data: import('../../shared/api')
             <YAxis hide domain={[lo - pad, hi + pad]} />
             <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: 'currentColor', fontSize: 11 }}
               className="text-faint" height={18} />
-            <Tooltip content={<TrendTip cur={cur} />} />
+            <Tooltip content={<TrendTip cur={cur} shown={shown} />} />
             <Area type="monotone" dataKey="value" stroke={accent} strokeWidth={2.5} fill="url(#nwFade)"
               dot={false} activeDot={{ r: 4, fill: accent, strokeWidth: 0 }} isAnimationActive={false} />
           </AreaChart>
@@ -369,12 +375,12 @@ function DonutTip({ active, payload, cur }: TipProps & { cur: string }) {
   )
 }
 
-function TrendTip({ active, payload, cur }: TipProps & { cur: string }) {
+function TrendTip({ active, payload, cur, shown }: TipProps & { cur: string; shown: boolean }) {
   if (!active || !payload?.length) return null
   return (
     <div className={tipCls}>
       <p className="mb-0.5 font-semibold">{payload[0].payload.label}</p>
-      <p className="tnum text-muted">≈ {fmtMoney(payload[0].value, cur)}</p>
+      <p className="tnum text-muted">≈ {fmtBalance(shown, payload[0].value, cur)}</p>
     </div>
   )
 }

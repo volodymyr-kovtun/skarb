@@ -16,6 +16,14 @@ All notable changes to Skarb are documented here. The format follows
   overflows `TimeSpan` on its own.
 
 ### Changed
+- **Balances are hidden until you ask for them.** Opening Skarb put the whole net worth on
+  screen in 64px type before you had asked a question, which is the wrong thing to be handed
+  when you came to check how the month is going. Balances — the net-worth hero, the
+  institution totals on the overview, and every figure on the Accounts page — now read as
+  dots, with an eye button next to the first of them that spells them out and remembers the
+  choice. Only *balances* go through the toggle: earned, spent, invested, the net for the
+  window and every transaction stay legible either way, and the net-worth curve keeps its
+  shape because an unlabelled line says how the months went without saying what they came to.
 - **The web app on a phone.** The five sections used to be a row of header pills that wrapped
   onto two lines and claimed the top third of a phone screen before any money was on it. Below
   `sm` they are now a bottom tab bar — an icon and a label per section, clear of the home

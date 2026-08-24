@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Landmark } from 'lucide-react'
 import { api, fmtMoney, refreshAll, type Account, type TelegramChat } from '../../shared/api'
-import { ACCOUNT_COLORS, Card, ColorPicker, Dot, Modal, ModalActions, bankLabel, btnGhost, btnPrimary, errMsg, fieldLabelCls, inputCls, pageTitleCls, sectionTitleCls } from '../../shared/ui'
+import { fmtBalance, useBalancesShown } from '../../shared/balances'
+import { ACCOUNT_COLORS, BalanceToggle, Card, ColorPicker, Dot, Modal, ModalActions, bankLabel, btnGhost, btnPrimary, errMsg, fieldLabelCls, inputCls, pageTitleCls, sectionTitleCls } from '../../shared/ui'
 
 const providerLabel: Record<string, string> = {
   manual: 'Manual',
@@ -36,6 +37,7 @@ export default function AccountsPage() {
   const { data: meta } = useQuery({ queryKey: ['meta'], queryFn: api.meta })
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<Account | null>(null)
+  const shown = useBalancesShown()
   const refresh = () => refreshAll(qc)
 
   const accounts = meta?.accounts ?? []
@@ -45,7 +47,10 @@ export default function AccountsPage() {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
-        <h1 className={pageTitleCls}>Accounts</h1>
+        <div className="flex items-center gap-3">
+          <h1 className={pageTitleCls}>Accounts</h1>
+          <BalanceToggle />
+        </div>
         <button className={btnPrimary} onClick={() => setAdding(true)}>
           <Plus size={16} />
           Add<span className="hidden sm:inline"> manual</span> account
@@ -75,7 +80,7 @@ export default function AccountsPage() {
                     {providers.length === 1 && ` · ${providerLabel[providers[0]] ?? providers[0]}`}
                   </span>
                   {sum && (
-                    <span className="tnum ml-auto text-[15px] font-semibold">{fmtMoney(sum.total, sum.currency)}</span>
+                    <span className="tnum ml-auto text-[15px] font-semibold">{fmtBalance(shown, sum.total, sum.currency)}</span>
                   )}
                 </header>
                 <div>
@@ -102,7 +107,7 @@ export default function AccountsPage() {
                           {a.lowBalanceThreshold != null && ` · alert < ${fmtMoney(a.lowBalanceThreshold, a.currency, { decimals: 0 })}`}
                         </span>
                       </span>
-                      <span className="tnum text-[14.5px] font-semibold">{fmtMoney(a.balance, a.currency)}</span>
+                      <span className="tnum text-[14.5px] font-semibold">{fmtBalance(shown, a.balance, a.currency)}</span>
                     </button>
                   ))}
                 </div>
@@ -121,7 +126,7 @@ export default function AccountsPage() {
                 className="flex items-center gap-3 rounded-row px-3 py-2.5 text-left transition-colors hover:bg-hover">
                 <Dot color={a.color} size={8} />
                 <span className="truncate">{bankLabel(a)} · {a.name}</span>
-                <span className="tnum ml-auto">{fmtMoney(a.balance, a.currency)}</span>
+                <span className="tnum ml-auto">{fmtBalance(shown, a.balance, a.currency)}</span>
               </button>
             ))}
           </div>

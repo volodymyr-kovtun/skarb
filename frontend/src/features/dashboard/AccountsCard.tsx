@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
-import { fmtMoney, type Account } from '../../shared/api'
+import { type Account } from '../../shared/api'
 import { Card, CardHeader, bankLabel, quietLinkCls } from '../../shared/ui'
+import { fmtBalance, useBalancesShown } from '../../shared/balances'
 import { useIsDark } from '../../shared/theme'
 import { swatch, tint } from '../../shared/color'
 
@@ -16,6 +17,10 @@ type Group = { label: string; color: string; total: number; rows: AccountRow[] }
 export default function AccountsCard({ rows, currency }: { rows: AccountRow[]; currency: string }) {
   const [open, setOpen] = useState<string | null>(null)
   const dark = useIsDark()
+  // Every institution's holding, summed, is the net worth the hero just dotted over —
+  // so these answer to the same toggle. The shares don't: a percentage of a hidden
+  // total is still nothing, and it is what makes this card readable at a glance.
+  const shown = useBalancesShown()
   if (rows.length === 0) return null
 
   const groups = groupByBank(rows)
@@ -57,7 +62,7 @@ export default function AccountsCard({ rows, currency }: { rows: AccountRow[]; c
                   </span>
                 </span>
                 <span className="shrink-0 text-right">
-                  <span className="tnum block text-[14.5px] font-semibold">{fmtMoney(g.total, currency)}</span>
+                  <span className="tnum block text-[14.5px] font-semibold">{fmtBalance(shown, g.total, currency)}</span>
                   <span className="tnum mt-0.5 block text-[12px] text-faint">
                     {positive > 0 ? `${sharePct(share(g.total))} of net worth` : ''}
                   </span>
@@ -78,9 +83,9 @@ export default function AccountsCard({ rows, currency }: { rows: AccountRow[]; c
                           ? ` · ${account.maskedPan.slice(-4)}`
                           : account.iban ? ` · …${account.iban.slice(-4)}` : ''}
                       </span>
-                      <span className="tnum shrink-0 font-semibold">{fmtMoney(account.balance, account.currency)}</span>
+                      <span className="tnum shrink-0 font-semibold">{fmtBalance(shown, account.balance, account.currency)}</span>
                       <span className="tnum w-28 shrink-0 whitespace-nowrap text-right text-[12px] text-faint">
-                        {account.currency === currency ? '' : `≈ ${fmtMoney(balanceConverted, currency)}`}
+                        {account.currency === currency ? '' : `≈ ${fmtBalance(shown, balanceConverted, currency)}`}
                       </span>
                     </li>
                   ))}

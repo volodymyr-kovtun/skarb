@@ -1,7 +1,8 @@
 import { useEffect, type ReactNode } from 'react'
-import { X, ArrowLeftRight, Monitor, Moon, Sun } from 'lucide-react'
+import { X, ArrowLeftRight, Eye, EyeOff, Monitor, Moon, Sun } from 'lucide-react'
 import { fmtMoney, type Category, type Tx } from './api'
 import { setThemeMode, useIsDark, useThemeMode, type ThemeMode } from './theme'
+import { setBalancesShown, useBalancesShown } from './balances'
 import { swatch, tint } from './color'
 import { format, isToday, isYesterday, parseISO } from 'date-fns'
 
@@ -210,6 +211,27 @@ export function ThemeToggle() {
     : mode === 'dark' ? 'Dark theme — follow the system instead'
     : 'Following the system — switch to light'
   return <IconButton label={label} onClick={() => setThemeMode(next[mode])}>{icon}</IconButton>
+}
+
+/**
+ * Dots the balances out, or brings them back. It sits next to a balance rather than in
+ * Settings so it is where you are when you decide you would rather not look — and so the
+ * same button puts the number back.
+ */
+export function BalanceToggle() {
+  const shown = useBalancesShown()
+  const label = shown ? 'Hide balances' : 'Show balances'
+  return (
+    <button
+      onClick={() => setBalancesShown(!shown)}
+      aria-pressed={shown}
+      title={label}
+      aria-label={label}
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface2 text-muted transition-colors hover:text-ink"
+    >
+      {shown ? <Eye size={15} /> : <EyeOff size={15} />}
+    </button>
+  )
 }
 
 /** The eight hues the design is built from, so a picked color always belongs. */

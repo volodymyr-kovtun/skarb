@@ -7,7 +7,9 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': 'http://localhost:5178',
+      // SKARB_API_URL points the dev server at another API — a sandbox on a spare port, so the
+      // UI can be driven against throwaway data while `make dev` keeps :5178 and the real ledger.
+      '/api': process.env.SKARB_API_URL ?? 'http://localhost:5178',
     },
   },
   build: {

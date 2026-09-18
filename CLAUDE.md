@@ -128,7 +128,9 @@ into that database: start a throwaway Postgres on another port, point `Connectio
 at it, run the API with `SKARB_DEV_AUTH_BYPASS=true ASPNETCORE_ENVIRONMENT=Development` on a
 spare `--urls`, and claim the instance via `POST /api/auth/setup` + `/setup/confirm` (TOTP from
 the returned secret) — otherwise `setupRequired` keeps every client on the setup screen even
-with the bypass on. `.claude/launch.json` defines a `skarb-web` Vite preview on :5273.
+with the bypass on. `.claude/launch.json` defines a `skarb-web` Vite preview on :5273; the dev
+server proxies `/api` to :5178 unless `SKARB_API_URL` names another API, which is how a Vite
+preview is pointed at the sandbox (`SKARB_API_URL=http://localhost:5199 npm run dev …`).
 
 ## Conventions
 

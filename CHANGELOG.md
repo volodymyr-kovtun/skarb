@@ -6,6 +6,11 @@ All notable changes to Skarb are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- **Switched-on filters on the Transactions page are readable again.** *Hide internal* and an
+  active tag filter stacked an accent background on top of the pill's quiet one, and which of
+  two background utilities wins is decided by their order in the stylesheet, not in the class
+  list — the quiet one won, under text meant for the accent. The label all but disappeared in
+  both themes. The on state is now a class of its own, so there is nothing left to conflict.
 - **A typo in `Sync__IntervalMinutes` no longer takes the API down.** The value went straight
   to `Task.Delay`, which rejects anything past ~49 days, and a background service that throws
   stops the whole host by default — so `Sync__IntervalMinutes=100000` killed the app seconds

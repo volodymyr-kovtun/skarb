@@ -181,10 +181,18 @@ export const btnPrimary =
 export const btnGhost =
   'inline-flex items-center justify-center gap-2 rounded-full bg-surface2 px-5 py-2.5 text-sm font-semibold text-muted ' +
   'transition-colors hover:text-ink disabled:opacity-60'
+const pillShape =
+  'inline-flex h-11 shrink-0 items-center gap-2 rounded-full px-4 text-sm font-semibold ' +
+  'transition-colors disabled:opacity-40'
 /** A filter control: same height and shape as a button, quieter. */
-export const pillCls =
-  'inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-surface2 px-4 text-sm font-semibold text-muted ' +
-  'transition-colors hover:text-ink disabled:opacity-40'
+export const pillCls = `${pillShape} bg-surface2 text-muted hover:text-ink`
+/**
+ * The same control, switched on. A constant of its own rather than extra classes on top of
+ * <code>pillCls</code>: two background utilities on one element are settled by their order in
+ * the stylesheet, not by which was written last, and `bg-surface2` sorts after `bg-accent` —
+ * so the stacked version kept the quiet background under the loud text and read as nothing.
+ */
+export const pillOnCls = `${pillShape} bg-accent text-paper`
 
 /** Round icon button used across the header and card actions. */
 export function IconButton({ label, onClick, children, className = '' }:

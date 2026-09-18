@@ -8,7 +8,7 @@ import {
 } from '../../shared/api'
 import {
   Card, Modal, ModalActions, TxRow, btnGhost, btnPrimary, dayLabel, errMsg, fieldLabelCls, inputCls, labelCls,
-  pageTitleCls, pillCls,
+  pageTitleCls, pillCls, pillOnCls,
 } from '../../shared/ui'
 import { useIsDark } from '../../shared/theme'
 import { swatch } from '../../shared/color'
@@ -218,7 +218,7 @@ function InternalToggle({ on, disabled, onChange }:
       title={disabled
         ? 'Not available while the internal-transfers filter is on'
         : 'Hide transfers between your own accounts'}
-      className={`${pillCls} ${halfWidth} justify-center sm:w-auto ${on ? 'bg-accent text-paper hover:text-paper' : ''}`}
+      className={`${on ? pillOnCls : pillCls} ${halfWidth} justify-center sm:w-auto`}
     >
       <ArrowLeftRight size={15} />
       Hide internal
@@ -257,7 +257,7 @@ function TagFilter({ tags, selected, onChange }:
       <button
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        className={`${pillCls} w-full justify-center sm:w-auto ${picked.length ? 'bg-accent text-paper hover:text-paper' : ''}`}
+        className={`${picked.length ? pillOnCls : pillCls} w-full justify-center sm:w-auto`}
       >
         <TagIcon size={15} />
         <span className="max-w-32 truncate">{label}</span>

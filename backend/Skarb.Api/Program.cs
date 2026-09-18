@@ -28,11 +28,12 @@ builder.Services.Configure<FxOptions>(builder.Configuration.GetSection(FxOptions
 builder.Services.AddSkarbAuthentication(builder.Configuration, builder.Environment);
 builder.Services.AddSkarbRateLimiting();
 
-// --- core pipeline (SRP: ingest → categorize → detect transfers) ---
+// --- core pipeline (SRP: ingest → categorize → detect transfers → move cash withdrawals) ---
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<ITransactionIngestor, TransactionIngestor>();
 builder.Services.AddScoped<ICategorizer, RuleBasedCategorizer>();
 builder.Services.AddScoped<ITransferDetector, TransferDetector>();
+builder.Services.AddScoped<ICashWithdrawalMirror, CashWithdrawalMirror>();
 builder.Services.AddSingleton<IExchangeRateService, OpenErApiExchangeRateService>();
 
 // --- bank providers (add a new bank = add one IBankProvider registration) ---

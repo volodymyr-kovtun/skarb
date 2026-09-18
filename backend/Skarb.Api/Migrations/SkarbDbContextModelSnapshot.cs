@@ -64,6 +64,9 @@ namespace Skarb.Api.Migrations
                     b.Property<bool>("IsArchived")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsCash")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsExcluded")
                         .HasColumnType("boolean");
 
@@ -91,6 +94,10 @@ namespace Skarb.Api.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ConnectionId");
+
+                    b.HasIndex("Currency")
+                        .IsUnique()
+                        .HasFilter("\"IsCash\"");
 
                     b.ToTable("Accounts");
                 });
@@ -345,6 +352,13 @@ namespace Skarb.Api.Migrations
                     b.Property<decimal>("Amount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("CashAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("CashCurrency")
+                        .HasColumnType("text");
 
                     b.Property<Guid?>("CategoryId")
                         .HasColumnType("uuid");

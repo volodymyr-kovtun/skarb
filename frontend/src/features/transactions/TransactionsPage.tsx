@@ -1,17 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
-import { ArrowLeftRight, ChevronDown, Plus, Search, Tag as TagIcon, X } from 'lucide-react'
+import { ArrowLeftRight, Check, ChevronDown, ListChecks, Plus, RotateCcw, Search, Tag as TagIcon, X } from 'lucide-react'
 import {
-  accountLabel, api, refreshAll, type Category, type Meta, type RuleSuggestion, type Tag, type Tx,
+  accountLabel, api, fmtMoney, refreshAll, type BulkPatch, type Category, type Meta, type RuleRevert,
+  type RuleSuggestion, type Tag, type Tx,
 } from '../../shared/api'
 import {
-  Card, Modal, ModalActions, TxRow, btnGhost, btnPrimary, dayLabel, errMsg, fieldLabelCls, inputCls, labelCls,
-  pageTitleCls, pillCls, pillOnCls,
+  Card, Modal, ModalActions, Toast, TxRow, btnGhost, btnPrimary, dayLabel, errMsg, fieldLabelCls, inputCls,
+  labelCls, pageTitleCls, pillCls, pillOnCls,
 } from '../../shared/ui'
 import { useIsDark } from '../../shared/theme'
 import { swatch } from '../../shared/color'
+import { CURRENCIES } from '../../shared/currency'
+import { BulkBar } from './BulkBar'
 import { RuleOfferSheet } from './RuleOfferSheet'
 
 /** Account and category filters: a native select wearing the same pill as everything else. */
@@ -49,6 +52,15 @@ export default function TransactionsPage() {
   // A category just changed by hand, and what Skarb would make of it. Held here rather than in
   // the editor so the offer outlives the modal that produced it.
   const [offer, setOffer] = useState<{ tx: Tx; category: Category; suggestion: RuleSuggestion } | null>(null)
+  // Selection is a set of ids rather than of rows, and deliberately outlives the page and the
+  // filters it was made under: search one merchant, tick them, search the next, tick those,
+  // then file the lot in one go.
+  const [selecting, setSelecting] = useState(false)
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkToast, setBulkToast] = useState<{ ok: boolean; text: string; reverts: RuleRevert[] } | null>(null)
+  // Where a shift-click measures its range from.
+  const anchor = useRef<string | null>(null)
 
   // Debounce typing so we don't fire a search request per keystroke.
   useEffect(() => {
@@ -57,8 +69,10 @@ export default function TransactionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search])
 
-  const params = useMemo(() => {
-    const p: Record<string, string | string[]> = { page: String(page), pageSize: '50' }
+  // The filters on their own, without the page — "select all" asks the same question of the
+  // whole ledger that the list asks of fifty rows at a time.
+  const filters = useMemo(() => {
+    const p: Record<string, string | string[]> = {}
     if (debouncedSearch) p.search = debouncedSearch
     if (accountId) p.accountId = accountId
     if (tagIds.length) p.tagIds = tagIds
@@ -70,7 +84,8 @@ export default function TransactionsPage() {
     // so the "internal" filter wins and the toggle sits disabled while it is on.
     if (hideInternal && categoryId !== 'internal') p.hideInternal = 'true'
     return p
-  }, [debouncedSearch, accountId, categoryId, tagIds, hideInternal, page])
+  }, [debouncedSearch, accountId, categoryId, tagIds, hideInternal])
+  const params = useMemo(() => ({ ...filters, page: String(page), pageSize: '50' }), [filters, page])
 
   const { data } = useQuery({
     queryKey: ['transactions', params],
@@ -92,6 +107,76 @@ export default function TransactionsPage() {
   const refresh = () => refreshAll(qc)
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1
 
+  const stopSelecting = useCallback(() => {
+    setSelecting(false)
+    setSelected(new Set())
+    setBulkToast(null)
+    anchor.current = null
+  }, [])
+
+  const toggle = (tx: Tx, e: ReactMouseEvent) => {
+    const items = data?.items ?? []
+    const from = items.findIndex((t) => t.id === anchor.current)
+    const to = items.findIndex((t) => t.id === tx.id)
+    setSelected((prev) => {
+      const next = new Set(prev)
+      // Shift extends from the last row touched, the way every list that has checkboxes does.
+      if (e.shiftKey && from >= 0 && to >= 0) {
+        for (let i = Math.min(from, to); i <= Math.max(from, to); i++) next.add(items[i].id)
+      } else if (!next.delete(tx.id)) {
+        next.add(tx.id)
+      }
+      return next
+    })
+    anchor.current = tx.id
+  }
+
+  const toggleDay = (items: Tx[]) => setSelected((prev) => {
+    const next = new Set(prev)
+    const all = items.every((t) => next.has(t.id))
+    for (const t of items) if (all) next.delete(t.id); else next.add(t.id)
+    return next
+  })
+
+  const selectAllMatching = async () => {
+    setBulkBusy(true)
+    try {
+      const { ids, total } = await api.transactionIds(filters)
+      setSelected(new Set(ids))
+      if (total > ids.length)
+        setBulkToast({ ok: true, text: `Selected the newest ${ids.length} of ${total} — the rest is one more pass`, reverts: [] })
+    } catch (e) {
+      setBulkToast({ ok: false, text: errMsg(e), reverts: [] })
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  const applyBulk = async (patch: BulkPatch, done: string) => {
+    setBulkBusy(true)
+    try {
+      const { updated, reverts } = await api.bulkUpdateTransactions([...selected], patch)
+      refresh()
+      setBulkToast({ ok: true, text: `${updated} transaction${updated === 1 ? '' : 's'} ${done}`, reverts })
+    } catch (e) {
+      setBulkToast({ ok: false, text: errMsg(e), reverts: [] })
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  const undoBulk = async (reverts: RuleRevert[]) => {
+    setBulkToast(null)
+    await api.revertRules(reverts)
+    refresh()
+  }
+
+  const newTag = async (name: string) => {
+    const tag = await api.createTag({ name })
+    rememberTag(qc, tag)
+    return tag
+  }
+
   /**
    * After a category is set by hand, ask whether it should become a rule. The save has already
    * landed, so this is pure upside: if the suggestion can't be fetched, or there is nothing worth
@@ -111,11 +196,24 @@ export default function TransactionsPage() {
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
         <h1 className={pageTitleCls}>Transactions</h1>
-        <button className={btnPrimary} onClick={() => setAdding(true)}>
-          <Plus size={16} />
-          {/* The page it sits on already says "transaction"; a phone needs the width more. */}
-          Add<span className="hidden sm:inline"> transaction</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {/* A mode rather than a checkbox on every row: the rows stay one tap from their editor
+              the rest of the time, and a phone has no hover to reveal a checkbox on. */}
+          <button
+            className={selecting ? btnPrimary : btnGhost}
+            onClick={() => (selecting ? stopSelecting() : setSelecting(true))}
+            aria-pressed={selecting}
+            title="Select several transactions to tag, file, mark internal or exclude at once"
+          >
+            <ListChecks size={16} />
+            Select
+          </button>
+          <button className={btnPrimary} onClick={() => setAdding(true)}>
+            <Plus size={16} />
+            {/* The page it sits on already says "transaction"; a phone needs the width more. */}
+            Add<span className="hidden sm:inline"> transaction</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter bar */}
@@ -164,14 +262,29 @@ export default function TransactionsPage() {
         />
       </Card>
 
-      <Card className="px-4 py-4">
+      {/* `select-none` because a shift-click would otherwise paint the page with a text selection. */}
+      <Card className={`px-4 py-4 ${selecting ? 'select-none' : ''}`}>
         {groups.length === 0 && (
           <p className="px-3 py-12 text-center text-sm text-faint">Nothing here yet. Adjust filters or add a transaction.</p>
         )}
         {groups.map((g) => (
           <div key={g.day} className="mt-2.5 first:mt-0">
-            <p className={`${labelCls} px-3 pb-1.5`}>{dayLabel(g.items[0].occurredAt)}</p>
-            {g.items.map((tx) => <TxRow key={tx.id} tx={tx} onClick={() => setEditing(tx)} />)}
+            <div className="flex items-baseline justify-between gap-3 px-3 pb-1.5">
+              <p className={labelCls}>{dayLabel(g.items[0].occurredAt)}</p>
+              {selecting && (
+                <button onClick={() => toggleDay(g.items)} className="text-xs font-semibold text-muted hover:text-ink">
+                  {g.items.every((t) => selected.has(t.id)) ? 'Clear day' : 'Select day'}
+                </button>
+              )}
+            </div>
+            {g.items.map((tx) => (
+              <TxRow
+                key={tx.id}
+                tx={tx}
+                selected={selecting ? selected.has(tx.id) : undefined}
+                onClick={(e) => (selecting ? toggle(tx, e) : setEditing(tx))}
+              />
+            ))}
           </div>
         ))}
       </Card>
@@ -203,8 +316,48 @@ export default function TransactionsPage() {
           onClose={() => setOffer(null)}
         />
       )}
+
+      {selecting && meta && (
+        <>
+          {/* The bar is fixed over the end of the list; this is the room it stands in. */}
+          <div className="h-28 sm:h-16" aria-hidden />
+          <BulkBar
+            count={selected.size}
+            matching={data?.total ?? 0}
+            meta={meta}
+            busy={bulkBusy}
+            onApply={applyBulk}
+            onSelectAll={selectAllMatching}
+            onNewTag={newTag}
+            onDone={stopSelecting}
+            toast={bulkToast && (
+              <Toast inline onClose={() => setBulkToast(null)}>
+                {bulkToast.ok
+                  ? <Check size={17} className="shrink-0 text-income" />
+                  : <X size={17} className="shrink-0 text-danger" />}
+                <span>{bulkToast.text}</span>
+                {bulkToast.reverts.length > 0 && (
+                  <button
+                    onClick={() => undoBulk(bulkToast.reverts)}
+                    className="ml-1 flex items-center gap-1.5 font-semibold text-accent hover:underline"
+                  >
+                    <RotateCcw size={14} />
+                    Undo
+                  </button>
+                )}
+              </Toast>
+            )}
+          />
+        </>
+      )}
     </div>
   )
+}
+
+/** Adds a just-created tag to the cached meta — immutably, never by mutating the cache object. */
+function rememberTag(qc: ReturnType<typeof useQueryClient>, tag: Tag) {
+  qc.setQueryData<Meta>(['meta'], (old) =>
+    old && !old.tags.some((t) => t.id === tag.id) ? { ...old, tags: [...old.tags, tag] } : old)
 }
 
 /** Drops transfers between your own accounts from the list, leaving only real money in and out. */
@@ -319,6 +472,19 @@ function TxForm({ meta, tx, onClose, onSaved }:
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
+  // A withdrawal that was moved to a cash wallet can say what the wallet really got. An empty
+  // amount means "what the bank says", which is why a correction is the only thing prefilled.
+  const cash = tx?.cash ?? null
+  const isWalletSide = tx?.source === 'cash'
+  const [cashCurrency, setCashCurrency] = useState(cash?.currency ?? '')
+  const [cashAmount, setCashAmount] = useState(cash?.corrected ? String(cash.amount) : '')
+  const abroad = !!cash && cashCurrency !== tx!.currency
+  const { data: estimate } = useQuery({
+    queryKey: ['cash-estimate', tx?.id, cashCurrency],
+    queryFn: () => api.cashEstimate(tx!.id, cashCurrency),
+    enabled: abroad,
+  })
+
   const account = meta.accounts.find((a) => a.id === accountId)
   // Money out can be an expense or an investment contribution; money in = income categories.
   const cats = meta.categories.filter((c) =>
@@ -333,6 +499,15 @@ function TxForm({ meta, tx, onClose, onSaved }:
         setError('Amount, description and account are required.')
         return
       }
+      // Only sent when it changed: an untouched block must not freeze today's figure into a
+      // correction, or the wallet would stop following the bank's amount when a hold settles.
+      const received = cashAmount.trim() === '' ? null : parseFloat(cashAmount)
+      const correcting = !!cash && internal &&
+        (cashCurrency !== cash.currency || received !== (cash.corrected ? cash.amount : null))
+      if (correcting && received !== null && !(received > 0)) {
+        setError('The cash you received has to be more than zero.')
+        return
+      }
       if (isEdit) {
         const saved = await api.updateTransaction(tx!.id, {
           description: description.trim(),
@@ -344,6 +519,7 @@ function TxForm({ meta, tx, onClose, onSaved }:
           categorySet: true,
           categoryId: categoryId || null,
           tagIds,
+          ...(correcting ? { cashSet: true, cashCurrency, cashAmount: received } : {}),
         })
         // Only a change to a real category is worth generalising — clearing one, or re-saving
         // the category it already had, teaches nothing.
@@ -370,7 +546,12 @@ function TxForm({ meta, tx, onClose, onSaved }:
   }
 
   const remove = async () => {
-    if (!confirm('Delete this transaction?')) return
+    const question = isWalletSide
+      ? 'Delete the wallet side? The withdrawal it belongs to goes back to counting as spending.'
+      : cash
+        ? 'Delete this withdrawal? The cash it put in your wallet goes with it.'
+        : 'Delete this transaction?'
+    if (!confirm(question)) return
     await api.deleteTransaction(tx!.id)
     onSaved()
   }
@@ -379,9 +560,7 @@ function TxForm({ meta, tx, onClose, onSaved }:
     const name = newTag.trim().toLowerCase()
     if (!name) return
     const tag = await api.createTag({ name })
-    // Update the cached meta immutably instead of mutating the cache object.
-    qc.setQueryData<Meta>(['meta'], (old) =>
-      old && !old.tags.some((t) => t.id === tag.id) ? { ...old, tags: [...old.tags, tag] } : old)
+    rememberTag(qc, tag)
     setTagIds((ids) => (ids.includes(tag.id) ? ids : [...ids, tag.id]))
     setNewTag('')
   }
@@ -468,12 +647,40 @@ function TxForm({ meta, tx, onClose, onSaved }:
           <input className={inputCls} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional" />
         </label>
 
-        {isEdit && (
+        {cash && internal && (
+          <CashReceived
+            tx={tx!}
+            wallets={meta.accounts.filter((a) => a.isCash).map((a) => a.currency)}
+            currency={cashCurrency}
+            amount={cashAmount}
+            estimate={abroad ? estimate?.amount : undefined}
+            // The figure typed for one currency means nothing in the next, and clearing it is
+            // what lets the estimate for the new one show through as the placeholder.
+            onCurrency={(c) => { setCashCurrency(c); setCashAmount('') }}
+            onAmount={setCashAmount}
+          />
+        )}
+
+        {isWalletSide && (
+          <p className="rounded-row bg-surface2 px-4 py-3 text-[13px] leading-relaxed text-muted">
+            The wallet side of a cash withdrawal — Skarb wrote it when the money left the bank.
+            To change what you received, open the withdrawal itself. Deleting this row counts the
+            withdrawal as spending again.
+          </p>
+        )}
+
+        {isEdit && !isWalletSide && (
           <>
             <label className="flex items-center gap-2 text-sm text-muted">
               <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} className="h-4 w-4 accent-[var(--sk-accent)]" />
               Internal transfer between my own accounts (never counted in stats)
             </label>
+            {cash && !internal && (
+              <p className="-mt-1.5 pl-6 text-xs leading-relaxed text-faint">
+                Saving this takes {fmtMoney(cash.amount, cash.currency)} back out of your cash wallet
+                and counts the withdrawal as spending.
+              </p>
+            )}
             <label className="flex items-center gap-2 text-sm text-muted">
               <input type="checkbox" checked={excluded} onChange={(e) => setExcluded(e.target.checked)} className="h-4 w-4 accent-[var(--sk-accent)]" />
               Exclude from stats for another reason (reimbursement, correction)
@@ -487,5 +694,58 @@ function TxForm({ meta, tx, onClose, onSaved }:
           onCancel={onClose} onSave={save} onDelete={isEdit ? remove : undefined} />
       </div>
     </Modal>
+  )
+}
+
+/**
+ * What a cash withdrawal actually put in the wallet. The bank only knows what left the account:
+ * a UAH card in an Italian ATM shows hryvnias while the hand holds euros, and the machine's own
+ * fee is in the bank's figure without ever reaching the wallet. Neither can be worked out from
+ * the statement, so the rate only ever fills the placeholder — the amount is the user's to give.
+ *
+ * @param estimate Today's-rate guess for another currency: undefined while it loads (or when
+ *   the currency is the account's own), null when there is no rate to guess with.
+ */
+function CashReceived({ tx, wallets, currency, amount, estimate, onCurrency, onAmount }: {
+  tx: Tx; wallets: string[]; currency: string; amount: string; estimate: number | null | undefined
+  onCurrency: (c: string) => void; onAmount: (a: string) => void
+}) {
+  const abroad = currency !== tx.currency
+  const options = [...new Set([tx.currency, tx.cash!.currency, ...wallets, ...CURRENCIES])]
+  const placeholder = !abroad ? Math.abs(tx.amount).toFixed(2)
+    : estimate != null ? `≈ ${estimate.toFixed(2)}`
+    : 'Amount received'
+
+  return (
+    <div className="border-t border-line pt-3">
+      <span className={fieldLabelCls}>Cash you received</span>
+      <div className="grid grid-cols-[1fr_6.5rem] gap-3">
+        <input
+          className={inputCls + ' tnum'} type="number" min="0" step="0.01" inputMode="decimal"
+          aria-label="Amount received" value={amount} placeholder={placeholder}
+          onChange={(e) => onAmount(e.target.value)}
+        />
+        <select className={inputCls} aria-label="Currency received" value={currency} onChange={(e) => onCurrency(e.target.value)}>
+          {options.map((c) => <option key={c}>{c}</option>)}
+        </select>
+      </div>
+      <p className="mt-1.5 text-xs leading-relaxed text-faint">
+        {!abroad ? (
+          <>
+            This withdrawal went to your {currency} cash wallet instead of counting as spending.
+            Took it out abroad, or the ATM kept a fee? Say what you were actually handed.
+          </>
+        ) : (
+          <>
+            Goes to your {currency} cash wallet{wallets.includes(currency) ? '' : ', which opens with it'}.{' '}
+            {estimate === null
+              ? 'Skarb has no rate for it, so the amount is yours to fill in.'
+              : amount.trim() === '' && estimate !== undefined
+                ? `Leave the amount empty to use today's rate — about ${fmtMoney(estimate, currency)} — or type what the ATM really paid out.`
+                : 'The rate is only a guess: fees and the bank\u2019s own spread are why the real figure differs.'}
+          </>
+        )}
+      </p>
+    </div>
   )
 }

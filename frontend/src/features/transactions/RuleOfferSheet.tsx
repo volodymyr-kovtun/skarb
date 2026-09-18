@@ -5,7 +5,7 @@ import {
   api, refreshAll, type Category, type RuleApplied, type RuleMatchCounts, type RuleScope,
   type RuleSuggestion, type Tx,
 } from '../../shared/api'
-import { Modal, TxRow, btnGhost, btnPrimary, errMsg, fieldLabelCls } from '../../shared/ui'
+import { Modal, Toast, TxRow, btnGhost, btnPrimary, errMsg, fieldLabelCls } from '../../shared/ui'
 
 /** Long enough to read the count and reach for Undo, short enough not to linger. */
 const TOAST_MS = 9000
@@ -223,24 +223,17 @@ function Breakdown({ counts, includeUntouched }:
  */
 function SavedToast({ applied, onUndo, onClose }:
   { applied: number; onUndo: () => void; onClose: () => void }) {
-  useEffect(() => {
-    const t = setTimeout(onClose, TOAST_MS)
-    return () => clearTimeout(t)
-  }, [onClose])
-
   return (
-    <div className="fixed inset-x-0 bottom-8 z-50 flex justify-center px-6" role="status">
-      <div className="flex items-center gap-3 rounded-full bg-surface px-5 py-3 text-sm font-semibold shadow-pop">
-        <Check size={17} className="shrink-0 text-income" />
-        <span>
-          Rule saved
-          {applied > 0 && ` · ${applied} transaction${applied === 1 ? '' : 's'} re-filed`}
-        </span>
-        <button onClick={onUndo} className="ml-1 flex items-center gap-1.5 font-semibold text-accent hover:underline">
-          <RotateCcw size={14} />
-          Undo
-        </button>
-      </div>
-    </div>
+    <Toast onClose={onClose} ms={TOAST_MS}>
+      <Check size={17} className="shrink-0 text-income" />
+      <span>
+        Rule saved
+        {applied > 0 && ` · ${applied} transaction${applied === 1 ? '' : 's'} re-filed`}
+      </span>
+      <button onClick={onUndo} className="ml-1 flex items-center gap-1.5 font-semibold text-accent hover:underline">
+        <RotateCcw size={14} />
+        Undo
+      </button>
+    </Toast>
   )
 }

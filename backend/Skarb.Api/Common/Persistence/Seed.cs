@@ -47,6 +47,7 @@ public static class Seed
         ("pzu", "taxes", 23), ("nfz", "taxes", 24), ("podatek", "taxes", 25),
         // bank fees / cash (matched via PKO type codes and descriptions)
         ("card-atm", "cash", 30), ("bankomat", "cash", 31), ("wypłata gotówki", "cash", 32),
+        ("банкомат", "cash", 33), ("зняття готівки", "cash", 34),
         ("opłata za", "fees", 35), ("prowizja", "fees", 36), ("fee", "fees", 37),
         // groceries
         ("biedronka", "groceries", 50), ("żabka", "groceries", 51), ("zabka", "groceries", 52),

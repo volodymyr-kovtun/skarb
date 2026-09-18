@@ -20,6 +20,11 @@ public static class TransactionSources
     public const string Sync = "sync";
     public const string Webhook = "webhook";
     public const string Import = "import";
+    /// <summary>
+    /// The wallet side of a cash withdrawal, written by Skarb rather than typed or synced. It
+    /// exists only because its withdrawal does, which is why it goes when the pair is released.
+    /// </summary>
+    public const string Cash = "cash";
 }
 
 /// <summary>
@@ -36,6 +41,11 @@ public static class InternalSources
     public const string Reference = "reference";
     /// <summary>Opposite-amount legs on two accounts, close in time.</summary>
     public const string Pair = "pair";
+    /// <summary>
+    /// A cash withdrawal, moved to the wallet for its currency. The other leg never reaches a
+    /// bank feed, so Skarb writes it — see <see cref="TransactionSources.Cash"/>.
+    /// </summary>
+    public const string Cash = "cash";
     /// <summary>Set by the user, never by detection.</summary>
     public const string Manual = "manual";
 }
@@ -95,6 +105,12 @@ public class Account
     /// consider yours to spend.
     /// </summary>
     public bool IsExcluded { get; set; }
+    /// <summary>
+    /// The cash held in this account's currency — where a withdrawal lands once it has left the
+    /// bank. At most one per currency, enforced by the database: a second wallet in a currency
+    /// would leave a withdrawal with no single place to go, and two balances that are really one.
+    /// </summary>
+    public bool IsCash { get; set; }
     /// <summary>
     /// Send a low-balance alert when <see cref="Balance"/> falls below this amount
     /// (in the account currency). Null = no alert for this account.
@@ -170,6 +186,16 @@ public class Transaction
     /// nothing has decided yet. Detection skips rows the user decided and only re-evaluates its own.
     /// </summary>
     public string? InternalSource { get; set; }
+    /// <summary>
+    /// On a cash withdrawal, what actually reached the wallet when that is not what left the
+    /// account: an ATM abroad pays out another currency, and its fee never arrives at all. Null
+    /// means the wallet received exactly <see cref="Amount"/>. It lives here rather than on the
+    /// wallet's own row because a settling hold rewrites <see cref="Amount"/> — and the wallet
+    /// should follow that, unless the user has said what they were really handed.
+    /// </summary>
+    public decimal? CashAmount { get; set; }
+    /// <summary>Currency of <see cref="CashAmount"/>. Set and cleared together with it.</summary>
+    public string? CashCurrency { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 

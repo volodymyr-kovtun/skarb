@@ -35,8 +35,17 @@ Built for a PKO BP + ZEN + Monobank setup, but works with 2,500+ European banks.
 - **Investment tracking** — categories have a kind (*spending / income / investment*).
   Transfers to your broker (IB is pre-wired via `ibkr` / `interactive brokers` rules) count
   toward "Invested" — this month and all time — and never inflate your spending.
+- **Cash wallets** — one per currency, built into the Accounts page. An ATM withdrawal
+  (anything filed under *Cash*: ATM merchant codes, `bankomat` / `банкомат` keywords, or you)
+  is moved to the wallet for its currency as an internal transfer instead of counting as
+  spending, and the wallet opens itself the first time it is needed. Took euros out of an
+  Italian ATM with a hryvnia card? The withdrawal's editor lets you say which currency and
+  how much you were actually handed, with today's rate as the starting guess. Archive a
+  wallet to stop tracking cash in that currency.
 - **Transactions** — search, filters (account, category, tag, plus *internal* and
-  *investments* views), day grouping, manual add/edit/delete, notes, tags
+  *investments* views), day grouping, manual add/edit/delete, notes, tags — and **bulk
+  edits**: select rows (shift-click, by day, or everything the filters match) and set a
+  category, add or remove a tag, mark them internal, or exclude them in one go
 - **Accounts you don't count** — money you hold but don't consider yours to spend (a shared
   pot, someone else's savings) can be marked *don't count* in the account editor. The account
   keeps syncing and the Accounts tab keeps reporting its balance, but it contributes nothing

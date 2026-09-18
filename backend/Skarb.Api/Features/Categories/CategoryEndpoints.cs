@@ -87,7 +87,7 @@ public class CategoryEndpoints : IEndpointGroup
 
         // Creating the rule and re-filing the past are one decision the user made, so they are one
         // call — splitting them invites a half-applied state when the second half fails.
-        rules.MapPost("/", async (CreateRuleRequest req, SkarbDbContext db, CancellationToken ct) =>
+        rules.MapPost("/", async (CreateRuleRequest req, SkarbDbContext db, ICashWithdrawalMirror cashMirror, CancellationToken ct) =>
         {
             var pattern = req.Pattern?.Trim() ?? "";
             if (pattern.Length == 0) return Results.BadRequest(new { error = "Pattern is required." });
@@ -110,12 +110,14 @@ public class CategoryEndpoints : IEndpointGroup
 
             var applied = await ApplyScopeAsync(db, pattern, req.CategoryId, req.ApplyTo, ct);
             await db.SaveChangesAsync(ct);
+            await FollowWithCashAsync(cashMirror, applied.Select(a => a.TransactionId), ct);
             return Results.Created($"/api/rules/{rule.Id}", new { rule.Id, applied = applied.Count, reverts = applied });
         });
 
         // Repointing the rule that already covers this keyword, rather than stacking a second one
         // beside it for the two to disagree over.
-        rules.MapPatch("/{id:guid}", async (Guid id, UpdateRuleRequest req, SkarbDbContext db, CancellationToken ct) =>
+        rules.MapPatch("/{id:guid}", async (
+            Guid id, UpdateRuleRequest req, SkarbDbContext db, ICashWithdrawalMirror cashMirror, CancellationToken ct) =>
         {
             var rule = await db.CategoryRules.FindAsync([id], ct);
             if (rule is null) return Results.NotFound();
@@ -129,12 +131,14 @@ public class CategoryEndpoints : IEndpointGroup
 
             var applied = await ApplyScopeAsync(db, rule.Pattern, req.CategoryId, req.ApplyTo, ct);
             await db.SaveChangesAsync(ct);
+            await FollowWithCashAsync(cashMirror, applied.Select(a => a.TransactionId), ct);
             return Results.Ok(new { rule.Id, applied = applied.Count, reverts = applied });
         });
 
         // Undo for the toast that follows a bulk re-file. The client hands back exactly what the
         // apply reported, so no history has to be kept anywhere.
-        rules.MapPost("/revert", async (RevertRuleRequest req, SkarbDbContext db, CancellationToken ct) =>
+        rules.MapPost("/revert", async (
+            RevertRuleRequest req, SkarbDbContext db, ICashWithdrawalMirror cashMirror, CancellationToken ct) =>
         {
             var ids = req.Entries.Select(e => e.TransactionId).ToList();
             var rows = await db.Transactions.Where(t => ids.Contains(t.Id)).ToDictionaryAsync(t => t.Id, ct);
@@ -147,6 +151,7 @@ public class CategoryEndpoints : IEndpointGroup
                 reverted++;
             }
             await db.SaveChangesAsync(ct);
+            await FollowWithCashAsync(cashMirror, ids, ct);
             return Results.Ok(new { reverted });
         });
 
@@ -161,12 +166,13 @@ public class CategoryEndpoints : IEndpointGroup
 
         // Re-run categorization over transactions that still have no category (e.g. after adding
         // rules). Only fills blanks, so nothing already filed — by hand or otherwise — is touched.
-        rules.MapPost("/apply", async (SkarbDbContext db, ICategorizer categorizer, CancellationToken ct) =>
+        rules.MapPost("/apply", async (
+            SkarbDbContext db, ICategorizer categorizer, ICashWithdrawalMirror cashMirror, CancellationToken ct) =>
         {
             var pending = await db.Transactions
                 .Where(t => t.CategoryId == null && !t.IsInternal)
                 .ToListAsync(ct);
-            var updated = 0;
+            var updated = new List<Guid>();
             foreach (var t in pending)
             {
                 var probe = new IncomingTransaction(t.ExternalId ?? t.Id.ToString(), t.Amount, t.Currency,
@@ -176,12 +182,22 @@ public class CategoryEndpoints : IEndpointGroup
                 if (verdict is null) continue;
                 t.CategoryId = verdict.CategoryId;
                 t.CategorySource = verdict.Source;
-                updated++;
+                updated.Add(t.Id);
             }
             await db.SaveChangesAsync(ct);
-            return Results.Ok(new { scanned = pending.Count, categorized = updated });
+            await FollowWithCashAsync(cashMirror, updated, ct);
+            return Results.Ok(new { scanned = pending.Count, categorized = updated.Count });
         });
     }
+
+    /// <summary>
+    /// Filing a row under Cash is what makes it a withdrawal, and filing it elsewhere is what
+    /// stops it being one — so every path that rewrites categories hands its rows to the mirror,
+    /// the undo included. Exactly those rows, whatever their age: the user asked for them by
+    /// keyword, which is asking for them all the same.
+    /// </summary>
+    private static Task FollowWithCashAsync(ICashWithdrawalMirror cashMirror, IEnumerable<Guid> ids, CancellationToken ct) =>
+        cashMirror.ReconcileAsync(ids.ToList(), ct);
 
     /// <summary>
     /// Re-files the past according to the requested scope. Returns what changed, previous category

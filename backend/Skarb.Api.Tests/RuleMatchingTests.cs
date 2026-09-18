@@ -28,6 +28,16 @@ public class RuleMatchingTests
     }
 
     [Fact]
+    public void Matches_is_case_insensitive_in_cyrillic_too()
+    {
+        // Monobank's ATM descriptor is what the seeded "банкомат" rule has to catch, and the
+        // bank capitalises it. An ASCII-only case fold would let every withdrawal through.
+        Assert.True(RuleBasedCategorizer.Matches("Банкомат 1616000011", "банкомат"));
+        Assert.True(RuleBasedCategorizer.Matches("Зняття готівки: банкомат", "зняття готівки"));
+        Assert.False(RuleBasedCategorizer.Matches("Банкоматний сервіс", "банкомат"));
+    }
+
+    [Fact]
     public void Matches_finds_later_occurrence_when_first_is_glued()
     {
         // first "zus" is glued (no match), second is a real word → true

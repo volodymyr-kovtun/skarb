@@ -1,5 +1,5 @@
-import { useEffect, type ReactNode } from 'react'
-import { X, ArrowLeftRight, Eye, EyeOff, Monitor, Moon, Sun } from 'lucide-react'
+import { useEffect, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
+import { X, ArrowLeftRight, Check, Eye, EyeOff, Monitor, Moon, Sun } from 'lucide-react'
 import { fmtMoney, type Category, type Tx } from './api'
 import { setThemeMode, useIsDark, useThemeMode, type ThemeMode } from './theme'
 import { setBalancesShown, useBalancesShown } from './balances'
@@ -37,8 +37,12 @@ export const fieldLabelCls = 'mb-1.5 block text-xs font-medium text-muted'
  */
 export const cardPadX = 'px-5 sm:px-7'
 
-/** Institution an account is grouped under. Manual accounts have no bank of their own. */
-export const bankLabel = (a: { bank: string }) => a.bank || 'Manual'
+/**
+ * Institution an account is grouped under. Manual accounts have no bank of their own, and cash
+ * wallets always gather under one heading — including one that was a plain manual account
+ * first and still carries whatever it was filed under then.
+ */
+export const bankLabel = (a: { bank: string; isCash?: boolean }) => (a.isCash ? 'Cash' : a.bank || 'Manual')
 
 export function errMsg(e: unknown, fallback = 'Something went wrong') {
   return e instanceof Error ? e.message : fallback
@@ -281,6 +285,26 @@ export function ModalActions({ busy = false, saveLabel = 'Save', onCancel, onSav
   )
 }
 
+/**
+ * A pill that reports what just happened and leaves on its own. Fixed to the bottom by default;
+ * <code>inline</code> is for a caller that already owns that corner and stacks the toast itself.
+ */
+export function Toast({ children, onClose, ms = 9000, inline = false }:
+  { children: ReactNode; onClose: () => void; ms?: number; inline?: boolean }) {
+  useEffect(() => {
+    const t = setTimeout(onClose, ms)
+    return () => clearTimeout(t)
+  }, [onClose, ms])
+
+  const pill = (
+    <div className="flex items-center gap-3 rounded-full bg-surface px-5 py-3 text-sm font-semibold shadow-pop" role="status">
+      {children}
+    </div>
+  )
+  if (inline) return pill
+  return <div className="fixed inset-x-0 bottom-8 z-50 flex justify-center px-6">{pill}</div>
+}
+
 export function dayLabel(iso: string) {
   const d = parseISO(iso)
   if (isToday(d)) return 'Today'
@@ -288,24 +312,57 @@ export function dayLabel(iso: string) {
   return format(d, 'EEEE, d MMMM')
 }
 
-/** Without an <code>onClick</code> the row is being shown as evidence, not offered as a control. */
-export function TxRow({ tx, onClick }: { tx: Tx; onClick?: () => void }) {
+/**
+ * Where a withdrawal's cash went, for the line under its name. The amount is only spelled out
+ * when it is not simply the bank's own — an ATM abroad, or one that kept a fee.
+ */
+function cashNote(tx: Tx) {
+  if (tx.source === 'cash') return 'withdrawal'
+  if (!tx.cash) return null
+  const same = tx.cash.currency === tx.currency && tx.cash.amount === -tx.amount
+  return same ? 'to cash' : `to cash as ${fmtMoney(tx.cash.amount, tx.cash.currency)}`
+}
+
+/**
+ * Without an <code>onClick</code> the row is being shown as evidence, not offered as a control.
+ * A defined <code>selected</code> means the list is in selection mode: the row becomes a
+ * checkbox, and the click that would have opened it toggles it instead.
+ */
+export function TxRow({ tx, onClick, selected }:
+  { tx: Tx; onClick?: (e: ReactMouseEvent) => void; selected?: boolean }) {
   const dark = useIsDark()
   const dimmed = tx.isInternal || tx.isExcluded
   const Row = onClick ? 'button' : 'div'
+  const selecting = selected !== undefined
+  const note = cashNote(tx)
   return (
     <Row
       onClick={onClick}
+      role={selecting ? 'checkbox' : undefined}
+      aria-checked={selecting ? selected : undefined}
       className={`flex w-full items-center gap-3.5 rounded-row px-3 py-2.5 text-left ${
-        onClick ? 'transition-colors hover:bg-hover' : ''}`}
+        onClick ? 'transition-colors hover:bg-hover' : ''} ${selected ? 'bg-accent/10 hover:bg-accent/15' : ''}`}
     >
-      {tx.isInternal ? (
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-tile bg-surface2 text-faint" aria-hidden>
-          <ArrowLeftRight size={17} />
+      {selecting && (
+        <span
+          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md transition-colors ${
+            selected ? 'bg-accent text-paper' : 'shadow-[inset_0_0_0_1.5px_var(--sk-faint)]'}`}
+          aria-hidden
+        >
+          {selected && <Check size={14} strokeWidth={3} />}
         </span>
-      ) : (
-        <CategoryDot category={tx.category} />
       )}
+      {/* On a phone the checkbox takes the tile's place rather than sitting beside it: the row
+          has no width to spare, and the line under the name still says the category. */}
+      <span className={selecting ? 'hidden shrink-0 sm:block' : 'shrink-0'}>
+        {tx.isInternal ? (
+          <span className="flex h-10 w-10 items-center justify-center rounded-tile bg-surface2 text-faint" aria-hidden>
+            <ArrowLeftRight size={17} />
+          </span>
+        ) : (
+          <CategoryDot category={tx.category} />
+        )}
+      </span>
       <div className="min-w-0 flex-1">
         <p className={`flex items-center gap-2 truncate text-[14.5px] font-semibold ${dimmed ? 'text-muted' : ''}`}>
           <span className="truncate">{tx.description}</span>
@@ -324,6 +381,7 @@ export function TxRow({ tx, onClick }: { tx: Tx; onClick?: () => void }) {
           <Dot color={tx.accountColor} size={6} />
           <span className="truncate">{tx.bank || tx.accountName}</span>
           {!tx.isInternal && tx.category && <span className="truncate">· {tx.category.name}</span>}
+          {tx.isInternal && note && <span className="truncate">· {note}</span>}
         </p>
       </div>
       <Money amount={tx.amount} currency={tx.currency} signed={!dimmed} muted={dimmed} className="text-[14.5px] font-semibold" />

@@ -51,14 +51,26 @@ public class SyncService(IServiceScopeFactory scopeFactory, ILowBalanceAlerter a
 
     private async Task DetectTransfersAsync()
     {
+        using var scope = scopeFactory.CreateScope();
         try
         {
-            using var scope = scopeFactory.CreateScope();
             await scope.ServiceProvider.GetRequiredService<ITransferDetector>().DetectAsync(CancellationToken.None);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Transfer detection after sync round failed");
+        }
+
+        // After detection, and on what it left: a withdrawal whose wallet side was typed in by
+        // hand pairs the ordinary way, and only the rest get a leg written for them. Its own
+        // try, so a detection failure does not also cost the round its withdrawals.
+        try
+        {
+            await scope.ServiceProvider.GetRequiredService<ICashWithdrawalMirror>().MirrorRecentAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Moving cash withdrawals after sync round failed");
         }
     }
 

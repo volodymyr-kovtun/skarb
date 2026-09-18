@@ -38,6 +38,43 @@ All notable changes to Skarb are documented here. The format follows
   keep the header pills.
 
 ### Added
+- **Cash wallets, and ATM withdrawals that move there instead of being spent.** Cash is now a
+  built-in section of the Accounts page: one wallet per currency, enforced by the database, so
+  a withdrawal always has exactly one place to go. A withdrawal — money out, filed under the
+  seeded **Cash** category — becomes a transfer: the bank row is marked *internal* and Skarb
+  writes the wallet side the bank never reports, so taking money out of an ATM stops counting
+  as spending and the wallet's balance follows along. The wallet for a currency opens itself
+  on the first withdrawal in it; **archiving a wallet is the off switch** for that currency.
+  The category *is* the signal, which keeps it correctable with what you already know: file a
+  missed ATM under Cash and it moves, file a false alarm anywhere else (or un-mark it as
+  internal) and the wallet side goes away. Rows you excluded by hand before wallets existed
+  are left alone until you include them again; rows you marked or un-marked as internal
+  yourself are never touched. ATM detection itself got wider: MCC 6010/6011 (cash at a
+  counter / from an ATM) now map to Cash rather than Fees, and `банкомат` / `зняття готівки`
+  join the seeded keywords, so Monobank withdrawals are caught without a rule of your own.
+  - **What you were actually handed.** A UAH card in an Italian ATM shows hryvnias on the
+    statement and puts euros in your hand, and the machine's fee is in the bank's figure
+    without ever reaching your wallet. The withdrawal's editor has a *Cash you received*
+    block — currency and amount. Switching the currency shows today's-rate estimate as the
+    placeholder (leave it empty to use it, frozen at save), and the cash moves to that
+    currency's wallet. Without a correction the wallet follows the bank's amount, including
+    when a hold settles differently.
+  - **Upgrading.** Manual accounts filed under the institution `Cash` (what the account form
+    used to suggest) become wallets on migration. Where two shared a currency they are
+    **merged into one** — transactions moved to the older live account, balance recomputed,
+    the emptied duplicate deleted. Any other manual account can be made a wallet from its
+    editor. History already in the ledger is not re-read: past withdrawals move only when
+    you edit them, which the new bulk edit makes a two-click job.
+- **Select several transactions and edit them at once.** *Select* on the Transactions page
+  turns rows into checkboxes — shift-click for a range, *Select day*, or *Select all N* for
+  everything the current filters match across every page. The selection survives paging and
+  filter changes on purpose: search one merchant, tick, search the next, tick, then file the
+  lot. A bar at the bottom (above the tab bar on a phone) sets a **category**, adds or removes
+  a **tag**, marks rows **internal** or not, and **excludes** them or counts them again. Each
+  choice applies on the click and keeps the selection, so filing forty rows and then tagging
+  the same forty is two clicks. Bulk edits stamp provenance exactly like single edits — they
+  are your decisions, so rule re-files and transfer detection step around them — and a bulk
+  category change comes back with an *Undo*.
 - **Skarb for iPhone** ([ios/](ios/README.md)) — a native SwiftUI client on the same API,
   with the same password + TOTP sign-in and the same `skarb.session` cookie, so nothing is
   duplicated server-side. The web's five pages become five tabs behind an iOS 26 Liquid Glass

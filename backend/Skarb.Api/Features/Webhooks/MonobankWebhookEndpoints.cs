@@ -51,14 +51,25 @@ public class MonobankWebhookEndpoints : IEndpointGroup
             // Monobank gets its 200 within the 5-second delivery deadline.
             _ = Task.Run(async () =>
             {
+                using var scope = scopeFactory.CreateScope();
+                var logger = loggerFactory.CreateLogger("MonobankWebhook");
                 try
                 {
-                    using var scope = scopeFactory.CreateScope();
                     await scope.ServiceProvider.GetRequiredService<ITransferDetector>().DetectAsync(CancellationToken.None);
                 }
                 catch (Exception ex)
                 {
-                    loggerFactory.CreateLogger("MonobankWebhook").LogError(ex, "Transfer detection after webhook failed");
+                    logger.LogError(ex, "Transfer detection after webhook failed");
+                }
+                // An ATM withdrawal reaches the wallet as fast as it reached the bank's feed. Same
+                // order as a sync round — detection first — and its own try, for the same reason.
+                try
+                {
+                    await scope.ServiceProvider.GetRequiredService<ICashWithdrawalMirror>().MirrorRecentAsync(CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Moving cash withdrawals after webhook failed");
                 }
                 // The push carried the fresh balance — this is what makes a low-balance
                 // alert land seconds after the payment, not at the next sync round.

@@ -1,5 +1,8 @@
 import { useState } from 'react'
 
+/** The currencies a manual account or a cash wallet can be opened in. */
+export const CURRENCIES = ['PLN', 'UAH', 'EUR', 'USD', 'GBP', 'CZK', 'CHF']
+
 /** Remembered so every report opens in the currency you last read your money in. */
 const CURRENCY_KEY = 'skarb.displayCurrency'
 

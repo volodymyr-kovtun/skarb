@@ -187,6 +187,10 @@ no code changes needed.
   delete any of them. Rules are **direction-aware** (an income category only matches money
   in) and match **whole words** on transfers/notes, plain substrings on glued card descriptors.
   Everything can be recategorized by clicking the transaction.
+- **ATM withdrawals are transfers, not spending.** Anything filed under *Cash* — by the
+  `CARD-ATM` type code, MCC 6010/6011, the `bankomat` / `банкомат` keywords, or by hand — is
+  moved to the cash wallet for its currency and marked internal. If a bank words its
+  withdrawals differently, one keyword rule pointing at Cash is all it takes.
 - **PKO sends no MCC codes** through Enable Banking, so for PKO only rules and the bank's
   type codes (`CARD-ATM`, `MOBILE-PAYMENT-C2C`, `FEE`, …) drive categorization. Card
   descriptors arrive as `CITY+MERCHANT+COUNTRY` glued together; Skarb cleans them

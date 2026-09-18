@@ -13,6 +13,8 @@ export type Account = {
   lowBalanceThreshold: number | null
   /** Telegram chat this account alerts; null = the default chat from Settings. */
   lowBalanceChatId: string | null
+  /** The cash held in this currency, where withdrawals land. There is at most one per currency. */
+  isCash: boolean
 }
 
 export type Tx = {
@@ -20,6 +22,12 @@ export type Tx = {
   amount: number; currency: string; description: string; counterParty: string | null
   mcc: number | null; category: Category | null; tags: Tag[]; occurredAt: string
   source: string; note: string | null; isExcluded: boolean; isInternal: boolean
+  /**
+   * On a withdrawal that was moved to a cash wallet: what the wallet received. `corrected` means
+   * you said so — otherwise it is simply the bank's amount, and follows it if a hold settles.
+   * The wallet's own row carries `source: 'cash'` instead, and has no `cash` of its own.
+   */
+  cash: { amount: number; currency: string; corrected: boolean } | null
 }
 
 export type Meta = { accounts: Account[]; categories: Category[]; tags: Tag[] }
@@ -87,6 +95,14 @@ export type RuleSuggestion = {
 /** One rewritten transaction and what it was filed as before — everything undo needs. */
 export type RuleRevert = { transactionId: string; previousCategoryId: string | null; previousSource: string | null }
 export type RuleApplied = { id: string; applied: number; reverts: RuleRevert[] }
+/** A bulk edit hands back what each re-filed row was before, so the toast can offer an undo. */
+export type BulkResult = { updated: number; reverts: RuleRevert[] }
+/** One edit over a selection. Fields left out are left alone. */
+export type BulkPatch = {
+  categorySet?: boolean; categoryId?: string | null
+  addTagIds?: string[]; removeTagIds?: string[]
+  isInternal?: boolean; isExcluded?: boolean
+}
 export type SyncStatus = {
   running: string[]
   logs: { at: string; provider: string; message: string; success: boolean; newTransactions: number }[]
@@ -126,6 +142,16 @@ async function http<T>(url: string, init?: RequestInit): Promise<T> {
   return res.json()
 }
 
+/** Array values are repeated (`tagIds=a&tagIds=b`), which is how the API reads a set. */
+function query(params: Record<string, string | string[]>) {
+  const q = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (Array.isArray(value)) value.forEach((v) => q.append(key, v))
+    else q.set(key, value)
+  }
+  return q
+}
+
 const get = <T,>(url: string) => http<T>(url)
 const post = <T,>(url: string, body?: unknown) => http<T>(url, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) })
 const patch = <T,>(url: string, body: unknown) => http<T>(url, { method: 'PATCH', body: JSON.stringify(body) })
@@ -155,15 +181,16 @@ export const api = {
     return get<Dashboard>('/api/dashboard' + (qs ? `?${qs}` : ''))
   },
 
-  /** Array values are repeated (`tagIds=a&tagIds=b`), which is how the API reads a set. */
-  transactions: (params: Record<string, string | string[]>) => {
-    const q = new URLSearchParams()
-    for (const [key, value] of Object.entries(params)) {
-      if (Array.isArray(value)) value.forEach((v) => q.append(key, v))
-      else q.set(key, value)
-    }
-    return get<Paged<Tx>>('/api/transactions?' + q)
-  },
+  transactions: (params: Record<string, string | string[]>) =>
+    get<Paged<Tx>>('/api/transactions?' + query(params)),
+  /** Every id the same filters match, not just a page of them — what "select all" selects. */
+  transactionIds: (params: Record<string, string | string[]>) =>
+    get<{ ids: string[]; total: number }>('/api/transactions/ids?' + query(params)),
+  bulkUpdateTransactions: (ids: string[], patch: BulkPatch) =>
+    post<BulkResult>('/api/transactions/bulk', { ids, ...patch }),
+  /** What a withdrawal would have paid out in another currency at today's rate; null = no rate. */
+  cashEstimate: (txId: string, currency: string) =>
+    get<{ amount: number | null }>(`/api/transactions/${txId}/cash-estimate?currency=${encodeURIComponent(currency)}`),
   createTransaction: (body: {
     accountId: string; amount: number; currency?: string; description: string
     categoryId: string | null; tagIds: string[]; occurredAt: string; note: string | null
@@ -172,15 +199,20 @@ export const api = {
     description?: string; amount?: number; occurredAt?: string; note?: string
     isExcluded?: boolean; isInternal?: boolean
     categorySet?: boolean; categoryId?: string | null; tagIds?: string[]
+    /** Set true to apply the two cash fields; a null amount in another currency uses today's rate. */
+    cashSet?: boolean; cashCurrency?: string; cashAmount?: number | null
   }) => patch<Tx>(`/api/transactions/${id}`, body),
   deleteTransaction: (id: string) => del(`/api/transactions/${id}`),
 
-  createAccount: (body: { name: string; bank: string; currency: string; balance: number; color?: string }) =>
-    post<Account>('/api/accounts', body),
+  /** A cash wallet (`isCash`) is named and filed by the server; everything else needs a name. */
+  createAccount: (body: {
+    name?: string; bank?: string; currency: string; balance: number; color?: string; isCash?: boolean
+  }) => post<Account>('/api/accounts', body),
   updateAccount: (id: string, body: {
     name?: string; color?: string; isArchived?: boolean; isExcluded?: boolean
     /** Set true to apply the two lowBalance fields; null threshold turns the alert off. */
     lowBalanceSet?: boolean; lowBalanceThreshold?: number | null; lowBalanceChatId?: string | null
+    isCash?: boolean
   }) => patch<Account>(`/api/accounts/${id}`, body),
   deleteAccount: (id: string) => del(`/api/accounts/${id}`),
 

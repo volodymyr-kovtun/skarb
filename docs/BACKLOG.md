@@ -147,6 +147,47 @@ bank's number, and the ledger is worth more when it matches the statement.
 
 ---
 
+## Withdrawals abroad that correct themselves
+
+**What.** A withdrawal in another currency lands in the right wallet, in the right
+currency, without being corrected by hand — and what the ATM cost on top shows up as
+a fee instead of vanishing.
+
+**Why.** A cash withdrawal is mirrored into the wallet of the *account's* currency,
+because that is all the ledger knows: a UAH card in an Italian ATM is a hryvnia row.
+The editor's *Cash you received* block fixes it, with today's rate as the starting
+guess — but it is a chore on exactly the trips where nobody wants one, and until it
+is done the euros sit in the hryvnia wallet.
+
+The second half is quieter. Bank row −₴12,478, wallet +€250: both are internal, so
+the ₴180 between them — the ATM's fee and the bank's spread — is counted nowhere. Net
+worth absorbs it; the spending report never sees it.
+
+**How, roughly.**
+
+- Monobank already says what the terminal dispensed: `operationAmount` and
+  `currencyCode` sit beside `amount` on every statement item, and
+  `MonobankProvider.MapStatementItem` drops them. Carried through
+  `IncomingTransaction` onto the row, they become the default for
+  `CashWithdrawal.Received` — still below a correction the user typed.
+- The gap, converted at the day's rate, could be written as a small *Fees* row beside
+  the pair, the way the wallet side is written today: derived, restated when either
+  side changes, removed with the pair.
+
+**Open questions.**
+
+- `operationAmount` includes the ATM operator's surcharge when there is one, so it is
+  what the machine *charged*, not always what it *handed over*. Closer than the
+  exchange rate, not exact — is a better default worth a second source of truth?
+- Minor units: Monobank reports integers, and `FromMinor` assumes two decimals. Yen
+  and forints would arrive a hundred times too small.
+- Enable Banking: does PKO report the original currency at all, or is this a
+  Monobank-only nicety?
+- A derived fee row needs a rate for the *day of the withdrawal*. The rate service
+  only knows today's — fine for a placeholder, wrong for a number that is kept.
+
+---
+
 ## One Enable Banking application, many banks
 
 **What.** The Enable Banking application — its ID and its RSA private key — is
@@ -254,9 +295,11 @@ in hand at the till. Two seconds of typing beats a form every time.
   Everything the message doesn't say is left to `ICategorizer` — keyword rules
   are exactly good at `żabka`. Optional `#tag` and an explicit category name for
   when the guess needs overriding.
-- **Where it lands.** One default account, chosen once, realistically the manual
-  cash account — `ManualAccountBalance.RecomputeAsync` already keeps a manual
-  account's balance as the sum of its rows, so a bot-added row keeps it honest.
+- **Where it lands.** The cash wallet — there is exactly one per currency now, so
+  `12.50 coffee` needs a default currency and `12.50 eur coffee` can name another.
+  `ManualAccountBalance.RecomputeAsync` already keeps a wallet's balance as the sum
+  of its rows, so a bot-added row keeps it honest. With withdrawals arriving in the
+  wallet on their own, this is the other half: the spending that empties it.
 - **Writing it.** `POST /api/transactions` hand-rolls the insert today, with its
   own categorizer probe, rather than going through `ITransactionIngestor` the way
   every synced source does. A second caller is the moment to lift that into one

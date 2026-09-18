@@ -35,11 +35,18 @@ public class SkarbDbContext(DbContextOptions<SkarbDbContext> options) : DbContex
             .HasMany(t => t.Tags)
             .WithMany(t => t.Transactions);
         b.Entity<Transaction>().Property(t => t.Amount).HasPrecision(18, 2);
+        b.Entity<Transaction>().Property(t => t.CashAmount).HasPrecision(18, 2);
 
         b.Entity<Account>()
             .HasOne(a => a.Connection)
             .WithMany(c => c.Accounts)
             .OnDelete(DeleteBehavior.SetNull);
+        // One cash wallet per currency, archived ones included — archiving a wallet is how a
+        // currency is opted out of withdrawal tracking, and a fresh wallet beside it would undo that.
+        b.Entity<Account>()
+            .HasIndex(a => a.Currency)
+            .IsUnique()
+            .HasFilter("\"IsCash\"");
         b.Entity<Account>().Property(a => a.Balance).HasPrecision(18, 2);
         b.Entity<Account>().Property(a => a.CreditLimit).HasPrecision(18, 2);
         b.Entity<Account>().Property(a => a.LowBalanceThreshold).HasPrecision(18, 2);

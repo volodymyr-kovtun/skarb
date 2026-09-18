@@ -64,8 +64,23 @@ Vertical slices over a small shared kernel. `Program.cs` is the only composition
 - **Sync orchestration** (`Features/Sync/SyncService.cs`): syncs run in the background per
   connection (Monobank rate limits make them minutes long; the UI polls `/api/sync/status`).
   `ITransferDetector` runs **once after the whole round**, not per connection, because pairing
-  needs both legs; `ILowBalanceAlerter.CheckAsync` runs after that, even on an empty round.
+  needs both legs; `ICashWithdrawalMirror.MirrorRecentAsync` runs on what detection left;
+  `ILowBalanceAlerter.CheckAsync` runs after that, even on an empty round.
   `BackgroundSyncService` triggers a round every `Sync:IntervalMinutes`.
+- **Cash wallets** (`Common/Services/CashWithdrawalMirror.cs`): an account with `IsCash` is the
+  wallet for its currency — at most one per currency, by a unique partial index, archived ones
+  included (archiving is the per-currency off switch). A *withdrawal* is money out in the
+  category with SystemKey `cash` on a non-wallet account; the mirror marks it internal and
+  **writes the wallet-side row itself** (`Source = cash`, `InternalSource = cash`, shared
+  `TransferGroupId`, `ExternalId = CashWithdrawal.LegKey`), opening the wallet if needed. That
+  row is derived state, restated from the withdrawal on every pass: `Transaction.CashAmount` /
+  `CashCurrency` on the *withdrawal* hold the user's "what I was actually handed" correction,
+  and null means "follow the bank's amount". It is the one deliberate exception to the
+  ingestor rule below the pipeline bullet — see the class remarks for why. Anything that
+  rewrites categories or internal marks must hand the touched ids to
+  `ICashWithdrawalMirror.ReconcileAsync` after saving (transaction PATCH / bulk / create, rule
+  apply and revert all do); sync, webhook and import call `MirrorRecentAsync`, which only
+  looks at the transfer lookback window so old history never moves on its own.
 - **Adding a bank** = `Infrastructure/Banking/<Bank>/` with a thin API client (HTTP/auth only,
   use `BankingHttp.ReadJsonAsync` for the shared error shape) + a provider implementing
   `IBankProvider` (`Key` must equal `BankConnection.Provider`), one `AddScoped<IBankProvider, …>()`
@@ -74,8 +89,11 @@ Vertical slices over a small shared kernel. `Program.cs` is the only composition
 - **Provenance fields are load-bearing.** `Transaction.CategorySource` (`CategorySources`) and
   `Transaction.InternalSource` (`InternalSources`) record *which signal* decided a category or an
   internal-transfer mark. `Manual` (and null, for pre-provenance rows) means the user decided;
-  automated passes — rule re-application, transfer re-detection — only ever rewrite rows their own
-  signal set. Preserve this when touching categorization or transfer code.
+  automated passes — rule re-application, transfer re-detection, the cash mirror — only ever
+  rewrite rows their own signal set. Preserve this when touching categorization or transfer
+  code. Edits that stamp provenance live in `Features/Transactions/TransactionEdits.cs` so the
+  single-row PATCH and `POST /api/transactions/bulk` cannot drift apart; un-marking a transfer
+  there releases the whole group and *removes* a `Source = cash` row instead of releasing it.
 - **What counts.** Dashboard and transaction-list money is narrowed by
   `TransactionQueries.OnCountedAccounts()` (not archived, not `IsExcluded`) and then
   `!t.IsExcluded && !t.IsInternal`. Categories of kind `investment` are excluded from spending
@@ -115,7 +133,8 @@ Vertical slices over a small shared kernel. `Program.cs` is the only composition
 
 `backend/Skarb.Api.Tests` is xUnit and tests **pure logic only** — no database, no HTTP.
 The pattern is to lift the decision into a static function (`TransferDetector.PairLegs`,
-`LowBalanceAlerter.Evaluate`, `ReportPeriod.Resolve`, `MerchantKeyword.For`) and test that;
+`CashWithdrawal.Decide`, `LowBalanceAlerter.Evaluate`, `ReportPeriod.Resolve`,
+`MerchantKeyword.For`) and test that;
 `InternalsVisibleTo("Skarb.Api.Tests")` is set, so `internal static` is fine. Test names are
 snake-case sentences (`Closest_match_wins_the_credit_over_an_earlier_debit`). Synthetic data
 only — never real IBANs, tokens or statements, even in tests.

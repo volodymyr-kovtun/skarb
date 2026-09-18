@@ -38,7 +38,10 @@ public class RuleBasedCategorizer(SkarbDbContext db) : ICategorizer
         (7011, 7011, "travel"),
         (8211, 8299, "education"),
         (8398, 8398, "donations"),
-        (6010, 6012, "fees"),
+        // Cash handed over at a counter (6010) or by an ATM (6011) is a withdrawal, not a charge:
+        // filed under Cash it moves to the wallet instead of being counted as money spent on fees.
+        (6010, 6011, "cash"),
+        (6012, 6012, "fees"),
         (6211, 6211, "brokerage"),
         (6300, 6300, "fees"),
     ];

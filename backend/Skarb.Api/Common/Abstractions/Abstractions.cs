@@ -73,6 +73,26 @@ public interface ITransferDetector
 }
 
 /// <summary>
+/// Turns a cash withdrawal into a transfer to the wallet for its currency, so money taken out
+/// of an ATM is moved rather than spent. Transfer detection cannot do this on its own: the
+/// second leg never reaches a bank feed, so there is nothing to pair with until Skarb writes it.
+/// </summary>
+public interface ICashWithdrawalMirror
+{
+    /// <summary>
+    /// Looks over the same recent window transfer detection does — after a sync round, a webhook
+    /// or an import. Returns the number of withdrawals newly moved to a wallet.
+    /// </summary>
+    Task<int> MirrorRecentAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Re-examines exactly these transactions, whatever their age — for after the user has edited
+    /// them, since a category set by hand is as good a signal as one a rule found.
+    /// </summary>
+    Task ReconcileAsync(IReadOnlyCollection<Guid> transactionIds, CancellationToken ct);
+}
+
+/// <summary>
 /// Watches account balances against their per-account thresholds and pings the configured
 /// Telegram chat when one drops below — so the person who tops the account up hears about
 /// it without opening the app.

@@ -3,7 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Landmark } from 'lucide-react'
 import { api, fmtMoney, refreshAll, type Account, type TelegramChat } from '../../shared/api'
 import { fmtBalance, useBalancesShown } from '../../shared/balances'
-import { ACCOUNT_COLORS, BalanceToggle, Card, ColorPicker, Dot, Modal, ModalActions, bankLabel, btnGhost, btnPrimary, errMsg, fieldLabelCls, inputCls, pageTitleCls, sectionTitleCls } from '../../shared/ui'
+import { CURRENCIES } from '../../shared/currency'
+import { ACCOUNT_COLORS, BalanceToggle, Card, ColorPicker, Dot, Modal, ModalActions, bankLabel, btnGhost, btnPrimary, errMsg, fieldLabelCls, inputCls, pageTitleCls, quietLinkCls, sectionTitleCls } from '../../shared/ui'
 
 const providerLabel: Record<string, string> = {
   manual: 'Manual',
@@ -12,6 +13,8 @@ const providerLabel: Record<string, string> = {
 }
 
 type Group = { label: string; accounts: Account[] }
+/** What the add dialog opens as. A wallet is not a kind of bank account, so it gets its own form. */
+type Adding = 'account' | 'wallet'
 
 /** One section per institution, biggest first — the page stays short as accounts pile up. */
 function groupByBank(accounts: Account[]): Group[] {
@@ -35,7 +38,7 @@ function singleCurrencyTotal(accounts: Account[]) {
 export default function AccountsPage() {
   const qc = useQueryClient()
   const { data: meta } = useQuery({ queryKey: ['meta'], queryFn: api.meta })
-  const [adding, setAdding] = useState(false)
+  const [adding, setAdding] = useState<Adding | null>(null)
   const [editing, setEditing] = useState<Account | null>(null)
   const shown = useBalancesShown()
   const refresh = () => refreshAll(qc)
@@ -43,6 +46,9 @@ export default function AccountsPage() {
   const accounts = meta?.accounts ?? []
   const active = accounts.filter((a) => !a.isArchived)
   const archived = accounts.filter((a) => a.isArchived)
+  // Archived wallets count too: the one-per-currency rule does not look at whether it is open.
+  const walletCurrencies = accounts.filter((a) => a.isCash).map((a) => a.currency)
+  const freeCurrencies = CURRENCIES.filter((c) => !walletCurrencies.includes(c))
 
   return (
     <div className="flex flex-col gap-5">
@@ -51,7 +57,7 @@ export default function AccountsPage() {
           <h1 className={pageTitleCls}>Accounts</h1>
           <BalanceToggle />
         </div>
-        <button className={btnPrimary} onClick={() => setAdding(true)}>
+        <button className={btnPrimary} onClick={() => setAdding('account')}>
           <Plus size={16} />
           Add<span className="hidden sm:inline"> manual</span> account
         </button>
@@ -71,15 +77,25 @@ export default function AccountsPage() {
           {groupByBank(active).map((g, i) => {
             const providers = [...new Set(g.accounts.map((a) => a.provider))]
             const sum = singleCurrencyTotal(g.accounts)
+            const wallets = g.accounts.every((a) => a.isCash)
             return (
               <div key={g.label} className={i > 0 ? 'mt-4 border-t border-line pt-4' : 'pt-3'}>
                 <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-3 pb-2">
                   <h2 className={sectionTitleCls}>{g.label}</h2>
                   <span className="text-[12.5px] text-faint">
-                    {g.accounts.length} account{g.accounts.length === 1 ? '' : 's'}
-                    {providers.length === 1 && ` · ${providerLabel[providers[0]] ?? providers[0]}`}
+                    {wallets
+                      ? `${g.accounts.length} wallet${g.accounts.length === 1 ? '' : 's'} · one per currency`
+                      : <>
+                          {g.accounts.length} account{g.accounts.length === 1 ? '' : 's'}
+                          {providers.length === 1 && ` · ${providerLabel[providers[0]] ?? providers[0]}`}
+                        </>}
                   </span>
-                  {sum && (
+                  {wallets && freeCurrencies.length > 0 && (
+                    <button className={`${quietLinkCls} ml-auto`} onClick={() => setAdding('wallet')}>
+                      Add currency
+                    </button>
+                  )}
+                  {sum && !wallets && (
                     <span className="tnum ml-auto text-[15px] font-semibold">{fmtBalance(shown, sum.total, sum.currency)}</span>
                   )}
                 </header>
@@ -101,7 +117,8 @@ export default function AccountsPage() {
                           )}
                         </span>
                         <span className="mt-0.5 block truncate text-[12.5px] text-faint">
-                          {a.currency}
+                          {/* A wallet is already named after its currency; say what it is for instead. */}
+                          {a.isCash ? 'Cash on hand · withdrawals land here' : a.currency}
                           {a.maskedPan ? ` · ${a.maskedPan.slice(-8)}` : a.iban ? ` · …${a.iban.slice(-6)}` : ''}
                           {providers.length > 1 && ` · ${providerLabel[a.provider] ?? a.provider}`}
                           {a.lowBalanceThreshold != null && ` · alert < ${fmtMoney(a.lowBalanceThreshold, a.currency, { decimals: 0 })}`}
@@ -133,18 +150,42 @@ export default function AccountsPage() {
         </details>
       )}
 
-      {adding && <AccountForm onClose={() => setAdding(false)} onSaved={() => { setAdding(false); refresh() }} />}
-      {editing && <AccountForm account={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); refresh() }} />}
+      {adding && (
+        <AccountForm
+          startAs={adding}
+          walletCurrencies={walletCurrencies}
+          onClose={() => setAdding(null)}
+          onSaved={() => { setAdding(null); refresh() }}
+        />
+      )}
+      {editing && (
+        <AccountForm
+          account={editing}
+          walletCurrencies={walletCurrencies}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); refresh() }}
+        />
+      )}
     </div>
   )
 }
 
-function AccountForm({ account, onClose, onSaved }:
-  { account?: Account; onClose: () => void; onSaved: () => void }) {
+/**
+ * @param walletCurrencies Currencies that already have a cash wallet. A new wallet may only take
+ *   one of the others, and an existing manual account can only become one while its own is free.
+ */
+function AccountForm({ account, startAs = 'account', walletCurrencies, onClose, onSaved }: {
+  account?: Account; startAs?: Adding; walletCurrencies: string[]; onClose: () => void; onSaved: () => void
+}) {
   const isEdit = !!account
+  const freeCurrencies = CURRENCIES.filter((c) => !walletCurrencies.includes(c))
+  const [kind, setKind] = useState<Adding>(startAs)
+  const wallet = !isEdit && kind === 'wallet'
   const [name, setName] = useState(account?.name ?? '')
   const [bank, setBank] = useState(account?.bank ?? '')
   const [currency, setCurrency] = useState(account?.currency ?? 'PLN')
+  const [walletCurrency, setWalletCurrency] = useState(freeCurrencies[0] ?? '')
+  const [isCash, setIsCash] = useState(account?.isCash ?? false)
   const [balance, setBalance] = useState('0')
   const [color, setColor] = useState(account?.color ?? ACCOUNT_COLORS[0])
   const [archived, setArchived] = useState(account?.isArchived ?? false)
@@ -202,11 +243,14 @@ function AccountForm({ account, onClose, onSaved }:
           return
         }
         await api.updateAccount(account!.id, {
-          name, color, isArchived: archived, isExcluded: excluded,
+          name, color, isArchived: archived, isExcluded: excluded, isCash,
           lowBalanceSet: true,
           lowBalanceThreshold: Number.isNaN(limit) ? null : limit,
           lowBalanceChatId: alertChat.trim() || null,
         })
+      } else if (wallet) {
+        if (!walletCurrency) { setError('Every currency Skarb lists already has a wallet.'); return }
+        await api.createAccount({ currency: walletCurrency, balance: parseFloat(balance || '0'), color, isCash: true })
       } else {
         if (!name.trim()) { setError('Give the account a name.'); return }
         await api.createAccount({ name: name.trim(), bank: bank.trim(), currency, balance: parseFloat(balance || '0'), color })
@@ -225,31 +269,79 @@ function AccountForm({ account, onClose, onSaved }:
     const warning = account!.connectionId
       ? `Delete "${account!.name}" and all its transactions? It stops syncing and won't come ` +
         `back on its own — Settings can bring it back later.`
-      : `Delete "${account!.name}" and all its transactions? This cannot be undone.`
+      : account!.isCash
+        // Deleting is not the off switch, and the difference is worth a sentence: the next
+        // withdrawal would open a fresh wallet, where an archived one keeps the currency out.
+        ? `Delete your ${account!.currency} cash wallet and everything in it? Withdrawals that were ` +
+          `moved here go back to counting as spending. To stop tracking ${account!.currency} cash ` +
+          `without losing the history, archive it instead.`
+        : `Delete "${account!.name}" and all its transactions? This cannot be undone.`
     if (!confirm(warning)) return
     await api.deleteAccount(account!.id)
     onSaved()
   }
 
   return (
-    <Modal title={isEdit ? 'Edit account' : 'Add manual account'} onClose={onClose}>
+    <Modal title={isEdit ? 'Edit account' : wallet ? 'Add cash wallet' : 'Add manual account'} onClose={onClose}>
       <div className="flex flex-col gap-3">
-        <label className="text-sm">
-          <span className={fieldLabelCls}>Name</span>
-          <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="Cash wallet" autoFocus />
-        </label>
-
         {!isEdit && (
+          <div className="grid grid-cols-2 gap-1 rounded-full bg-surface2 p-1.5">
+            {([['account', 'Account'], ['wallet', 'Cash wallet']] as const).map(([k, label]) => (
+              <button
+                key={k}
+                onClick={() => setKind(k)}
+                className={`rounded-full py-2 text-sm font-semibold transition-colors ${kind === k ? 'bg-surface text-ink shadow-card' : 'text-muted hover:text-ink'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {wallet && (
+          <>
+            <p className="text-[13px] leading-relaxed text-muted">
+              The cash you hold in one currency. ATM withdrawals in it land here as transfers
+              instead of counting as spending — there is one wallet per currency, so a
+              withdrawal always knows where to go.
+            </p>
+            {freeCurrencies.length === 0 ? (
+              <p className="text-sm text-muted">Every currency Skarb lists already has a wallet.</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <label className="text-sm">
+                  <span className={fieldLabelCls}>Currency</span>
+                  <select className={inputCls} value={walletCurrency} onChange={(e) => setWalletCurrency(e.target.value)}>
+                    {freeCurrencies.map((c) => <option key={c}>{c}</option>)}
+                  </select>
+                </label>
+                <label className="text-sm">
+                  <span className={fieldLabelCls}>Cash on hand</span>
+                  <input className={inputCls + ' tnum'} type="number" step="0.01" value={balance} onChange={(e) => setBalance(e.target.value)} autoFocus />
+                </label>
+              </div>
+            )}
+          </>
+        )}
+
+        {!wallet && (
+          <label className="text-sm">
+            <span className={fieldLabelCls}>Name</span>
+            <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="Savings jar" autoFocus />
+          </label>
+        )}
+
+        {!isEdit && !wallet && (
           <>
             <label className="text-sm">
               <span className={fieldLabelCls}>Bank / institution (optional)</span>
-              <input className={inputCls} value={bank} onChange={(e) => setBank(e.target.value)} placeholder="ZEN, cash, …" />
+              <input className={inputCls} value={bank} onChange={(e) => setBank(e.target.value)} placeholder="ZEN, Revolut, …" />
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="text-sm">
                 <span className={fieldLabelCls}>Currency</span>
                 <select className={inputCls} value={currency} onChange={(e) => setCurrency(e.target.value)}>
-                  {['PLN', 'UAH', 'EUR', 'USD', 'GBP', 'CZK', 'CHF'].map((c) => <option key={c}>{c}</option>)}
+                  {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
                 </select>
               </label>
               <label className="text-sm">
@@ -324,6 +416,21 @@ function AccountForm({ account, onClose, onSaved }:
                 </>
               )}
             </div>
+            {/* Offered where it can succeed: on a manual account, and only while its currency has
+                no wallet — or this account is that wallet. */}
+            {account!.provider === 'manual' && (account!.isCash || !walletCurrencies.includes(account!.currency)) && (
+              <div className="border-t border-line pt-3">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input type="checkbox" checked={isCash} onChange={(e) => setIsCash(e.target.checked)} className="h-4 w-4 accent-[var(--sk-accent)]" />
+                  This is my {account!.currency} cash wallet
+                </label>
+                <p className="mt-1 pl-6 text-xs leading-relaxed text-faint">
+                  ATM withdrawals in {account!.currency} land here as transfers instead of counting as
+                  spending. There is one wallet per currency; archive it to stop tracking
+                  {' '}{account!.currency} cash.
+                </p>
+              </div>
+            )}
             <div className="border-t border-line pt-3">
               <label className="flex items-center gap-2 text-sm font-medium">
                 <input type="checkbox" checked={excluded} onChange={(e) => setExcluded(e.target.checked)} className="h-4 w-4 accent-[var(--sk-accent)]" />

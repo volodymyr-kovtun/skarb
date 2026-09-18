@@ -13,13 +13,15 @@ public class CsvImportEndpoints : IEndpointGroup
     public void Map(IEndpointRouteBuilder app)
     {
         app.MapPost("/api/import/csv",
-            async (CsvImportRequest req, SkarbDbContext db, CsvImportService csv, ITransferDetector transferDetector) =>
+            async (CsvImportRequest req, SkarbDbContext db, CsvImportService csv,
+                   ITransferDetector transferDetector, ICashWithdrawalMirror cashMirror) =>
         {
             var account = await db.Accounts.FindAsync(req.AccountId);
             if (account is null) return Results.BadRequest(new { error = "Account not found" });
 
             var result = await csv.ImportAsync(account, req, CancellationToken.None);
             await transferDetector.DetectAsync(CancellationToken.None);
+            await cashMirror.MirrorRecentAsync(CancellationToken.None);
             return Results.Ok(result);
         });
     }

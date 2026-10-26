@@ -16,7 +16,11 @@ public record UpdateConnectionRequest(string DisplayName);
 public record MonobankConnectRequest(string Token);
 public record MonobankWebhookRequest(string PublicBaseUrl);
 public record EnableBankingConnectRequest(string DisplayName, string ApplicationId, string PrivateKeyPem);
-public record EnableBankingAuthorizeRequest(string AspspName, string AspspCountry, string RedirectUrl);
+/// <param name="Client">
+/// "app" when the iPhone app started this authorization — see <see cref="EnableBankingState"/>.
+/// Anything else, or nothing, is the web app.
+/// </param>
+public record EnableBankingAuthorizeRequest(string AspspName, string AspspCountry, string RedirectUrl, string? Client = null);
 public record EnableBankingCompleteRequest(string Code);
 
 public class ConnectionEndpoints : IEndpointGroup
@@ -158,7 +162,7 @@ public class ConnectionEndpoints : IEndpointGroup
             await db.SaveChangesAsync();
 
             var url = await eb.StartAuthAsync(settings, req.AspspName, req.AspspCountry,
-                req.RedirectUrl, conn.Id.ToString(), CancellationToken.None);
+                req.RedirectUrl, EnableBankingState.For(conn.Id, req.Client), CancellationToken.None);
             return Results.Ok(new { url });
         });
 
@@ -182,4 +186,26 @@ public class ConnectionEndpoints : IEndpointGroup
         return new ConnectionDto(conn.Id, conn.Provider, conn.DisplayName, conn.Status,
             conn.LastSyncedAt, conn.LastError, accountCount, validUntil, conn.IgnoredExternalIds.Count);
     }
+}
+
+/// <summary>
+/// The OAuth <c>state</c> Enable Banking hands back with the authorization code.
+/// </summary>
+/// <remarks>
+/// Every authorization returns to the one redirect URL the owner registered with Enable Banking,
+/// <c>/settings</c> on this server, and Enable Banking only accepts https there — so the iPhone app
+/// cannot be called back directly. It opens the bank in a browser sheet that holds no Skarb
+/// session, which means the web page that lands there cannot finish the job either. The app's
+/// authorizations therefore carry <see cref="AppPrefix"/> in front of the connection id, and the
+/// web page passes any state wearing it straight on to the app (<c>frontend/src/shared/appHandoff.ts</c>),
+/// which completes the link with its own session. A web authorization keeps the bare id it always had.
+/// </remarks>
+public static class EnableBankingState
+{
+    public const string AppPrefix = "app:";
+
+    public static string For(Guid connectionId, string? client) =>
+        string.Equals(client?.Trim(), "app", StringComparison.OrdinalIgnoreCase)
+            ? AppPrefix + connectionId
+            : connectionId.ToString();
 }

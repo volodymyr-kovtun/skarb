@@ -7,9 +7,10 @@ using Skarb.Api.Common.Persistence;
 namespace Skarb.Api.Common.Services;
 
 /// <summary>
-/// Marks transfers between the user's own accounts as internal using three signals:
+/// Marks transfers between the user's own accounts as internal using four signals:
 /// 1. the counterparty IBAN belongs to one of the user's accounts;
-/// 2. a bank-issued reference shared by both legs of one operation;
+/// 2. a bank-issued reference shared by both legs of one operation, or — for a currency
+///    exchange between two wallets — one leg recording the other's amount as its original;
 /// 3. an opposite-amount pair in the same currency lands on two different accounts
 ///    within the pair window (classic A→B transfer where both banks are synced).
 /// Both legs get a shared TransferGroupId so they can be un-marked together, and every
@@ -33,10 +34,16 @@ public partial class TransferDetector(SkarbDbContext db, IOptions<SyncOptions> o
             .ToListAsync(ct);
         var ibanToAccount = ownIbans.ToDictionary(x => Normalize(x.Iban!), x => x.Id);
 
-        // CreatedAt catches historical rows that a first sync/import just brought in;
-        // OccurredAt catches the steady-state window.
+        // CreatedAt catches historical rows that a first sync/import just brought in; OccurredAt
+        // catches the steady-state window. Those historical rows' partners are as old as they are
+        // and were synced long ago, so the window opens far enough back to reach them too —
+        // otherwise a ZEN statement imported in October could never find the August PKO debit
+        // that topped it up, and both legs would count as money spent and earned.
+        var from = DetectionStart(
+            cutoff, pairWindow,
+            await db.Transactions.Where(t => t.CreatedAt >= cutoff).MinAsync(t => (DateTime?)t.OccurredAt, ct));
         var recent = await db.Transactions
-            .Where(t => !t.IsExcluded && (t.OccurredAt >= cutoff || t.CreatedAt >= cutoff))
+            .Where(t => !t.IsExcluded && (t.OccurredAt >= from || t.CreatedAt >= cutoff))
             .OrderBy(t => t.OccurredAt)
             .ToListAsync(ct);
 
@@ -75,6 +82,22 @@ public partial class TransferDetector(SkarbDbContext db, IOptions<SyncOptions> o
                 tx.IsInternal = true;
                 tx.InternalSource = InternalSources.Reference;
                 tx.TransferGroupId = group;
+            }
+        }
+
+        // Signal 2b: a currency exchange between two of the owner's wallets (ZEN keeps one per
+        // currency). The legs share no reference and no amount — only one of them says what the
+        // other side was, as its original amount — so they are matched on exactly that.
+        foreach (var (debit, credit) in PairExchanges(
+                     detectorOwned.Where(t => t.TransferGroupId == null && t.InternalSource is null).ToList(), pairWindow))
+        {
+            var group = Guid.NewGuid();
+            foreach (var leg in new[] { debit, credit })
+            {
+                if (!leg.IsInternal) marked++;
+                leg.IsInternal = true;
+                leg.InternalSource = InternalSources.Exchange;
+                leg.TransferGroupId = group;
             }
         }
 
@@ -168,6 +191,63 @@ public partial class TransferDetector(SkarbDbContext db, IOptions<SyncOptions> o
         }
         return pairs;
     }
+
+    /// <summary>
+    /// Pairs the two legs of currency exchanges: money out in one currency and money in, in
+    /// another, on a different account, where one leg's original amount is exactly the other's
+    /// amount. ZEN records the far side on at least one leg of every exchange — which one varies
+    /// by direction — so either may carry it. Both must read as an exchange: a card payment
+    /// abroad carries a foreign original amount too, and a same-size credit in that currency
+    /// is not its other half. Closest in time first, like <see cref="PairLegs"/>.
+    /// </summary>
+    internal static List<(Transaction Debit, Transaction Credit)> PairExchanges(
+        IReadOnlyList<Transaction> legs, TimeSpan window)
+    {
+        var exchanges = legs.Where(t => IsCurrencyExchange(t.TypeCode, t.Description)).ToList();
+        var credits = exchanges.Where(t => t.Amount > 0).ToList();
+        var candidates =
+            from debit in exchanges.Where(t => t.Amount < 0)
+            from credit in credits
+            where credit.AccountId != debit.AccountId &&
+                  credit.Currency != debit.Currency &&
+                  (Names(debit, credit) || Names(credit, debit))
+            let delta = (credit.OccurredAt - debit.OccurredAt).Duration()
+            where delta <= window
+            orderby delta, debit.Id, credit.Id
+            select (Debit: debit, Credit: credit);
+
+        var taken = new HashSet<Guid>();
+        var pairs = new List<(Transaction, Transaction)>();
+        foreach (var (debit, credit) in candidates)
+        {
+            if (taken.Contains(debit.Id) || taken.Contains(credit.Id)) continue;
+            taken.Add(debit.Id);
+            taken.Add(credit.Id);
+            pairs.Add((debit, credit));
+        }
+        return pairs;
+
+        // One leg names the other: its original amount is the other's amount, in the other's currency.
+        static bool Names(Transaction leg, Transaction other) =>
+            leg.OriginalCurrency == other.Currency &&
+            leg.OriginalAmount is decimal original && Math.Abs(original) == Math.Abs(other.Amount);
+    }
+
+    /// <summary>
+    /// Whether a row reads as one side of a currency exchange — ZEN's "Exchange money" type, or a
+    /// "Currency exchange …" description where an import kept no type.
+    /// </summary>
+    internal static bool IsCurrencyExchange(string? typeCode, string? description) =>
+        (typeCode?.Contains("exchange", StringComparison.OrdinalIgnoreCase) ?? false) ||
+        (description?.Contains("currency exchange", StringComparison.OrdinalIgnoreCase) ?? false);
+
+    /// <summary>
+    /// Where detection starts looking: the lookback cutoff, or earlier when rows created since
+    /// then are dated earlier — a statement import or a newly connected bank — far enough back to
+    /// reach the partners those rows were paired against.
+    /// </summary>
+    internal static DateTime DetectionStart(DateTime cutoff, TimeSpan pairWindow, DateTime? oldestFresh) =>
+        oldestFresh is DateTime oldest && oldest - pairWindow < cutoff ? oldest - pairWindow : cutoff;
 
     private static string Normalize(string iban) => iban.Replace(" ", "").ToUpperInvariant();
 

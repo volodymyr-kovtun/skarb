@@ -36,6 +36,7 @@ public class SkarbDbContext(DbContextOptions<SkarbDbContext> options) : DbContex
             .WithMany(t => t.Transactions);
         b.Entity<Transaction>().Property(t => t.Amount).HasPrecision(18, 2);
         b.Entity<Transaction>().Property(t => t.CashAmount).HasPrecision(18, 2);
+        b.Entity<Transaction>().Property(t => t.OriginalAmount).HasPrecision(18, 2);
 
         b.Entity<Account>()
             .HasOne(a => a.Connection)

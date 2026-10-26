@@ -21,6 +21,19 @@ public class RuleMatchingTests
     }
 
     [Fact]
+    public void A_zen_card_row_keeps_whole_word_matching()
+    {
+        // ZEN's "Card payment" descriptors keep their spaces; PKO's glued ones are what the
+        // substring fallback is for, and they come with an uppercase "CARD-…" code.
+        const string zen = "AROMA COFFEE WARSZAWA,POL CARD: MASTERCARD *0000";
+        var haystack = RuleBasedCategorizer.Haystack(zen, null, null, "Card payment");
+
+        Assert.False(RuleBasedCategorizer.RuleHits(haystack, "Card payment", "fee"));
+        Assert.True(RuleBasedCategorizer.RuleHits(haystack, "Card payment", "coffee"));
+        Assert.True(RuleBasedCategorizer.RuleHits("WARSZAWAFOUNDATIONCOFFEE.PL", "CARD-PAYMENT", "coffee"));
+    }
+
+    [Fact]
     public void Matches_is_case_insensitive()
     {
         Assert.True(RuleBasedCategorizer.Matches("biedronka 7184", "BIEDRONKA"));

@@ -21,7 +21,8 @@ public record TransactionDto(
     Guid Id, Guid AccountId, string AccountName, string AccountColor, string Bank,
     decimal Amount, string Currency, string Description, string? CounterParty,
     int? Mcc, CategoryDto? Category, List<TagDto> Tags, DateTime OccurredAt,
-    string Source, string? Note, bool IsExcluded, bool IsInternal, CashLegDto? Cash);
+    string Source, string? Note, bool IsExcluded, bool IsInternal, CashLegDto? Cash,
+    decimal? OriginalAmount, string? OriginalCurrency);
 
 public record PagedResult<T>(List<T> Items, int Total, int Page, int PageSize);
 
@@ -39,7 +40,8 @@ public static class Map
         t.Id, t.AccountId, t.Account?.Name ?? "", t.Account?.Color ?? "#64748B",
         t.Account?.Bank ?? "", t.Amount, t.Currency, t.Description, t.CounterParty,
         t.Mcc, t.Category?.ToDto(), t.Tags.Select(x => x.ToDto()).ToList(),
-        t.OccurredAt, t.Source, t.Note, t.IsExcluded, t.IsInternal, t.CashLeg());
+        t.OccurredAt, t.Source, t.Note, t.IsExcluded, t.IsInternal, t.CashLeg(),
+        t.OriginalAmount, t.OriginalCurrency);
 
     /// <summary>
     /// Read off the withdrawal alone — the wallet's own row is derived from these same fields, so

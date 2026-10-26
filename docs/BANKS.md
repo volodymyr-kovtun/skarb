@@ -147,11 +147,26 @@ The honest result of the research: **ZEN has no path to automatic sync today.**
    file per currency you use.
 2. In Skarb, create a manual account per ZEN currency once (**Accounts → Add manual
    account**, bank "ZEN").
+   Give it the wallet's balance on the statement's first day as the opening balance (the
+   statement's *Opening balance* line) — a manual account's balance is the sum of its rows.
 3. **Settings → Import CSV (ZEN, …)** → choose the ZEN account, preset **ZEN.com
-   statement**, pick the file, check the column mapping against the file's header
-   (first column = 0), **Import**.
+   statement**, pick the file, **Import**. There is no column mapping to check: the file is
+   read by its own header. Importing a file into the account of another currency is refused.
 
 Re-importing an overlapping period is safe — Skarb deduplicates rows it has already seen.
+
+What comes out of it:
+
+- **Exchanges between ZEN wallets are internal.** Import every wallet you exchange between;
+  the two sides are paired because one of them always records the other's amount. An exchange
+  into a wallet you haven't imported (a USD one, say) stays a plain outflow until you do.
+- **Top-ups from PKO are internal** — by amount (BLIK, card) or by IBAN (a bank transfer to the
+  wallet's IBAN, which the import copies onto the account), however long after the fact the
+  statement is imported.
+- Transfers to Interactive Brokers land in *Brokerage* (invested, not spent); ZEN's own
+  processing and subscription fees in *Fees & Charges*.
+- If the import reports that the statement's closing balance differs from the account's, the
+  opening balance is usually what's missing.
 
 Worth re-checking twice a year: if ZEN ever shows up in Enable Banking's coverage
 (https://enablebanking.com/api/aspsps), the PKO connector above will work for ZEN too,

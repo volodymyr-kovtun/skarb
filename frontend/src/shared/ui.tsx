@@ -335,6 +335,9 @@ export function TxRow({ tx, onClick, selected }:
   const Row = onClick ? 'button' : 'div'
   const selecting = selected !== undefined
   const note = cashNote(tx)
+  // An exchange leg says what it turned into; a payment abroad, what it cost there.
+  const original = tx.originalAmount != null && tx.originalCurrency
+    ? fmtMoney(Math.abs(tx.originalAmount), tx.originalCurrency) : null
   return (
     <Row
       onClick={onClick}
@@ -382,6 +385,7 @@ export function TxRow({ tx, onClick, selected }:
           <span className="truncate">{tx.bank || tx.accountName}</span>
           {!tx.isInternal && tx.category && <span className="truncate">· {tx.category.name}</span>}
           {tx.isInternal && note && <span className="truncate">· {note}</span>}
+          {original && <span className="shrink-0">· {original}</span>}
         </p>
       </div>
       <Money amount={tx.amount} currency={tx.currency} signed={!dimmed} muted={dimmed} className="text-[14.5px] font-semibold" />

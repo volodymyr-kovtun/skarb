@@ -28,6 +28,12 @@ export type Tx = {
    * The wallet's own row carries `source: 'cash'` instead, and has no `cash` of its own.
    */
   cash: { amount: number; currency: string; corrected: boolean } | null
+  /**
+   * What the operation was worth in another currency, when the bank said: a card payment
+   * abroad, or the far side of a currency exchange between two wallets.
+   */
+  originalAmount: number | null
+  originalCurrency: string | null
 }
 
 export type Meta = { accounts: Account[]; categories: Category[]; tags: Tag[] }
@@ -274,7 +280,9 @@ export const api = {
     accountId: string; content: string
     dateColumn: number; amountColumn: number; descriptionColumn: number; currencyColumn: number | null
     dateFormat: string; decimalSeparator: string; delimiter: string; hasHeader: boolean; invertAmount: boolean
-  }) => post<{ imported: number; skipped: number; errors: string[] }>('/api/import/csv', body),
+    /** A bank's own statement layout, read by its header; the column fields are then ignored. */
+    format?: 'zen' | null
+  }) => post<{ imported: number; skipped: number; errors: string[]; warnings?: string[] | null }>('/api/import/csv', body),
 }
 
 // Intl.NumberFormat construction is expensive and fmtMoney runs per row and per

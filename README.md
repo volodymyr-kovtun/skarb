@@ -71,7 +71,8 @@ Built for a PKO BP + ZEN + Monobank setup, but works with 2,500+ European banks.
   webhook, otherwise at the next sync). Each alert names the chat it pings — point the
   shared card at the person who tops it up. One ping per drop, a daily reminder while it
   stays low, re-armed when the balance recovers. Setup: [docs/ALERTS.md](docs/ALERTS.md).
-- **CSV import** — presets for ZEN and PKO iPKO, configurable column mapping, duplicate-safe re-imports
+- **CSV import** — ZEN statements read as-is (exchanges between wallets paired as internal),
+  a PKO iPKO preset, configurable column mapping for anything else, duplicate-safe re-imports
 
 ## Quick start
 

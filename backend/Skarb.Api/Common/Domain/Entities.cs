@@ -42,6 +42,11 @@ public static class InternalSources
     /// <summary>Opposite-amount legs on two accounts, close in time.</summary>
     public const string Pair = "pair";
     /// <summary>
+    /// Two legs of one currency exchange between the user's accounts: one side records the
+    /// other's amount, in the other's currency, as what the operation was worth (ZEN wallets).
+    /// </summary>
+    public const string Exchange = "exchange";
+    /// <summary>
     /// A cash withdrawal, moved to the wallet for its currency. The other leg never reaches a
     /// bank feed, so Skarb writes it — see <see cref="TransactionSources.Cash"/>.
     /// </summary>
@@ -196,6 +201,16 @@ public class Transaction
     public decimal? CashAmount { get; set; }
     /// <summary>Currency of <see cref="CashAmount"/>. Set and cleared together with it.</summary>
     public string? CashCurrency { get; set; }
+    /// <summary>
+    /// What the operation was worth in another currency, as the bank reported it: the foreign
+    /// amount of a card payment abroad, or the other side of a currency exchange. Null when the
+    /// bank gave none or it was in <see cref="Currency"/> anyway. An exchange between two of the
+    /// owner's wallets has no shared reference and no matching amount, so this is the only thing
+    /// that ties its two legs together — see <see cref="InternalSources.Exchange"/>.
+    /// </summary>
+    public decimal? OriginalAmount { get; set; }
+    /// <summary>Currency of <see cref="OriginalAmount"/>. Set together with it.</summary>
+    public string? OriginalCurrency { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 

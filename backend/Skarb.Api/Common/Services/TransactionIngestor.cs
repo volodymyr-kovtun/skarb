@@ -34,6 +34,10 @@ public class TransactionIngestor(SkarbDbContext db, ICategorizer categorizer, IO
                 known.OccurredAt = item.OccurredAtUtc;
                 known.TypeCode ??= item.TypeCode;
                 known.CounterIban ??= item.CounterIban;
+                // Filled in, never overwritten — so re-importing a statement through a parser that
+                // reads more of it enriches the rows an earlier, plainer import created.
+                if (known.OriginalAmount is null && item.OriginalAmount is not null)
+                    (known.OriginalAmount, known.OriginalCurrency) = (item.OriginalAmount, item.OriginalCurrency);
                 continue;
             }
 
@@ -51,6 +55,8 @@ public class TransactionIngestor(SkarbDbContext db, ICategorizer categorizer, IO
                 OccurredAt = item.OccurredAtUtc,
                 Source = item.Source,
                 Note = item.Note,
+                OriginalAmount = item.OriginalAmount,
+                OriginalCurrency = item.OriginalCurrency,
             };
             // Recording which signal filed it is what later lets a bulk re-file tell a guess
             // apart from a decision the user made.

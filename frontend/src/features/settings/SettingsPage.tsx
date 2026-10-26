@@ -516,11 +516,15 @@ function EnableBankingModal({ onClose }: { onClose: () => void }) {
   )
 }
 
-const CSV_PRESETS: Record<string, { label: string; hint: string; dateColumn: number; amountColumn: number; descriptionColumn: number; currencyColumn: number | null; dateFormat: string; decimalSeparator: string; delimiter: string; invertAmount: boolean }> = {
+// `format` presets are read by the server from the file's own header, so their column numbers
+// are never sent anywhere that uses them — ZEN's statement has a block of account details above
+// the table and its columns moved once already, which a fixed mapping can't follow.
+const CSV_PRESETS: Record<string, { label: string; hint: string; format?: 'zen'; dateColumn: number; amountColumn: number; descriptionColumn: number; currencyColumn: number | null; dateFormat: string; decimalSeparator: string; delimiter: string; invertAmount: boolean }> = {
   zen: {
     label: 'ZEN.com statement',
-    hint: 'ZEN app → Wallet → currency → ⋯ → Statements → Generate (CSV). One file per currency.',
-    dateColumn: 0, amountColumn: 1, descriptionColumn: 3, currencyColumn: 2,
+    hint: 'ZEN app → Wallet → currency → ⋯ → Statements → Generate (CSV). One file per currency, each into its own ZEN account — exchanges between them are matched up as internal.',
+    format: 'zen',
+    dateColumn: 0, amountColumn: 3, descriptionColumn: 2, currencyColumn: 4,
     dateFormat: '', decimalSeparator: '.', delimiter: ',', invertAmount: false,
   },
   pko: {
@@ -568,9 +572,11 @@ function CsvModal({ meta, onClose, onDone }: { meta: Meta; onClose: () => void; 
         descriptionColumn: cfg.descriptionColumn, currencyColumn: cfg.currencyColumn,
         dateFormat: cfg.dateFormat, decimalSeparator: cfg.decimalSeparator,
         delimiter: cfg.delimiter, hasHeader, invertAmount: cfg.invertAmount,
+        format: cfg.format ?? null,
       })
       const err = r.errors.length ? ` (${r.errors.length} row(s) skipped with errors)` : ''
-      onDone(`Imported ${r.imported} transaction(s), ${r.skipped} duplicate(s) skipped${err}.`)
+      const warn = r.warnings?.length ? ' ' + r.warnings.join(' ') : ''
+      onDone(`Imported ${r.imported} transaction(s), ${r.skipped} duplicate(s) skipped${err}.${warn}`)
     } catch (e) {
       setError(errMsg(e, 'Import failed'))
     } finally {
@@ -605,7 +611,7 @@ function CsvModal({ meta, onClose, onDone }: { meta: Meta; onClose: () => void; 
           <input type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
         </label>
 
-        <details className="text-sm text-muted">
+        {!cfg.format && <details className="text-sm text-muted">
           <summary className="cursor-pointer text-xs font-medium">Column mapping (first column = 0)</summary>
           <div className="mt-2 grid grid-cols-4 gap-2">
             <label className="text-xs">Date col
@@ -632,7 +638,7 @@ function CsvModal({ meta, onClose, onDone }: { meta: Meta; onClose: () => void; 
               Header row
             </label>
           </div>
-        </details>
+        </details>}
 
         {error && <p className="text-sm text-danger">{error}</p>}
         <div className="flex justify-end gap-2">

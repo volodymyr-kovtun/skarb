@@ -6,6 +6,32 @@ All notable changes to Skarb are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- **ZEN statements import as ZEN wrote them, and money moving between your wallets stops
+  counting as spending.** The *ZEN.com statement* preset pointed at columns the current export
+  doesn't have (amount in column 1 is the transaction type) and choked on the block of account
+  details above the table. ZEN files are now read by their own header, server-side: no column
+  mapping, no preamble errors, and the transaction type and the *original amount* come along.
+  - **Currency exchanges between ZEN wallets are internal.** A PLN → EUR exchange is two rows in
+    two files with no shared reference and amounts in different currencies, so nothing could pair
+    them: −700 zł counted as spending and +€161.21 as income. ZEN records the far side of every
+    exchange as one leg's original amount, and transfer detection now pairs on exactly that (new
+    `exchange` source). The far amount also shows on the row — *−zł 700.00 · €161.21*.
+  - **Top-ups from PKO pair even when the statement is imported weeks later.** Detection only
+    looked 14 days back, so an August ZEN top-up imported in October could never meet the PKO
+    debit it came from — that one counted as *Transfers to people* and the ZEN side as income.
+    When a sync or import brings in older rows, detection now reaches back to their dates.
+  - The wallet's own IBAN is read off the statement onto the account (the PLN wallet's bare
+    26-digit number gets its `PL`), so a PKO transfer to it is internal by IBAN alone; a transfer
+    naming one of your IBANs in its description is internal the same way.
+  - Importing the PLN file into the EUR account is refused instead of landing zloty in a euro
+    balance, and when the statement's closing balance disagrees with the account the import
+    says so — usually an opening balance the account was created without.
+  - ZEN card rows match rules on whole words, as their descriptors keep their spaces: substring
+    matching (meant for PKO's glued `WARSZAWAFOUNDATIONCOFFEE.PL`) filed *AROMA COFFEE* under Fees
+    because "fee" sits inside "coffee". Small incoming exchange legs are no longer guessed to be
+    cashback either.
+  - **Already imported?** Import the same files again with the ZEN preset: rows are matched to the
+    ones you have (same ids), filled in with what the plain import left out, and paired.
 - **Switched-on filters on the Transactions page are readable again.** *Hide internal* and an
   active tag filter stacked an accent background on top of the pill's quiet one, and which of
   two background utilities wins is decided by their order in the stylesheet, not in the class

@@ -38,6 +38,9 @@ public sealed record IncomingTransaction(
     /// <summary>Bank-supplied transaction type (e.g. "CARD-ATM", "FEE"), when available. Rules can match on it.</summary>
     public string? TypeCode { get; init; }
     public string? Note { get; init; }
+    /// <summary>The operation's worth in another currency — see <see cref="Transaction.OriginalAmount"/>.</summary>
+    public decimal? OriginalAmount { get; init; }
+    public string? OriginalCurrency { get; init; }
 }
 
 /// <summary>

@@ -79,8 +79,11 @@ public class RuleBasedCategorizer(SkarbDbContext db) : ICategorizer
             if (isP2P && _categoriesBySystemKey.TryGetValue("transfers-in", out var fromPeople))
                 return new CategoryVerdict(fromPeople, CategorySources.Heuristic);
             // Small anonymous credits (card cashback, interest) — large ones stay for the user (salary vs refund).
+            // The incoming side of a currency exchange looks exactly like that and is neither: it is
+            // the owner's own money changing wallets, which transfer detection marks internal.
             var anonymous = string.IsNullOrWhiteSpace(counterParty) && !isP2P;
-            if (amount < 50 && anonymous && _categoriesBySystemKey.TryGetValue("interest-cashback", out var income))
+            if (amount < 50 && anonymous && !TransferDetector.IsCurrencyExchange(item.TypeCode, item.Description) &&
+                _categoriesBySystemKey.TryGetValue("interest-cashback", out var income))
                 return new CategoryVerdict(income, CategorySources.Heuristic);
             return null;
         }
@@ -128,11 +131,14 @@ public class RuleBasedCategorizer(SkarbDbContext db) : ICategorizer
     /// Card-terminal descriptors arrive glued together ("WARSZAWAFOUNDATIONCOFFEE.PL",
     /// "mesGymBeamSK"), so word boundaries can't be trusted there — card rows fall back to
     /// substring matching; everything else (transfers, notes) gets whole-word matching.
+    /// The card check is the bank's uppercase type code (PKO's "CARD-PAYMENT"), case and all:
+    /// ZEN's statement says "Card payment" over descriptors that keep their spaces, and
+    /// substring matching there only adds misses like "fee" firing inside "AROMA COFFEE".
     /// </remarks>
     public static bool RuleHits(string haystack, string? typeCode, string pattern)
     {
         if (string.IsNullOrWhiteSpace(pattern)) return false;
-        var isCardRow = typeCode?.StartsWith("CARD", StringComparison.OrdinalIgnoreCase) ?? false;
+        var isCardRow = typeCode?.StartsWith("CARD", StringComparison.Ordinal) ?? false;
         return isCardRow
             ? haystack.Contains(pattern, StringComparison.OrdinalIgnoreCase)
             : Matches(haystack, pattern);

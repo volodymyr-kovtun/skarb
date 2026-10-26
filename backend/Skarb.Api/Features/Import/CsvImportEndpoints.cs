@@ -3,10 +3,15 @@ using Skarb.Api.Common.Persistence;
 
 namespace Skarb.Api.Features.Import;
 
+/// <param name="Format">
+/// A bank's own statement layout (<see cref="CsvFormats"/>), read by its header — the column
+/// fields are then ignored. Null for a plain table described by the column numbers.
+/// </param>
 public record CsvImportRequest(
     Guid AccountId, string Content,
     int DateColumn, int AmountColumn, int DescriptionColumn, int? CurrencyColumn,
-    string? DateFormat, string? DecimalSeparator, string? Delimiter, bool HasHeader, bool InvertAmount);
+    string? DateFormat, string? DecimalSeparator, string? Delimiter, bool HasHeader, bool InvertAmount,
+    string? Format = null);
 
 public class CsvImportEndpoints : IEndpointGroup
 {

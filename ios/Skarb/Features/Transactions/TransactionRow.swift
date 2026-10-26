@@ -1,16 +1,24 @@
 import SwiftUI
 
 /// One transaction, as it appears everywhere a list of them does. Without an `onTap` the row
-/// is being shown as evidence, not offered as a control.
+/// is being shown as evidence, not offered as a control. A non-nil `selected` means the list is
+/// in selection mode: the row becomes a checkbox, and the tap that would open it toggles it.
 struct TransactionRow: View {
     let tx: Tx
+    var selected: Bool?
     var onTap: (() -> Void)?
 
     private var dimmed: Bool { tx.isInternal || tx.isExcluded }
+    private var selecting: Bool { selected != nil }
 
     var body: some View {
         let row = HStack(spacing: 12) {
-            if tx.isInternal {
+            if let selected {
+                // The mark takes the tile's place rather than sitting beside it: a phone has no
+                // width to spare, and the line under the name still says the category.
+                SelectionMark(selected: selected)
+                    .frame(width: 40, height: 40)
+            } else if tx.isInternal {
                 RoundedRectangle(cornerRadius: Palette.Radius.tile)
                     .fill(Palette.surface2)
                     .frame(width: 40, height: 40)
@@ -37,7 +45,7 @@ struct TransactionRow: View {
                 }
                 HStack(spacing: 5) {
                     ColorDot(hex: tx.accountColor, size: 6)
-                    Text(subtitle)
+                    Text(TransactionDetails.subtitleParts(tx).joined(separator: " · "))
                         .font(.system(size: 12.5))
                         .foregroundStyle(Palette.faint)
                         .lineLimit(1)
@@ -50,29 +58,17 @@ struct TransactionRow: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 9)
+        .background(
+            selected == true ? Palette.accent.opacity(0.1) : Color.clear,
+            in: .rect(cornerRadius: Palette.Radius.row))
 
         if let onTap {
             Button(action: onTap) { row.contentShape(.rect) }
                 .buttonStyle(RowButtonStyle())
+                .accessibilityAddTraits(selected == true ? [.isSelected] : [])
+                .accessibilityHint(selecting ? "Toggles selection" : "Opens the transaction")
         } else {
             row
         }
-    }
-
-    private var subtitle: String {
-        let account = tx.bank.isEmpty ? tx.accountName : tx.bank
-        if !tx.isInternal, let category = tx.category { return "\(account) · \(category.name)" }
-        return account
-    }
-}
-
-/// A list row that lights up while it is held, the way the web's rows do on hover.
-struct RowButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .background(
-                configuration.isPressed ? Palette.hover : Color.clear,
-                in: .rect(cornerRadius: Palette.Radius.row))
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }

@@ -110,10 +110,18 @@ personal finance.
    - **Continue** → pick *PKO Bank Polski* from the PL list → you're redirected to PKO,
      confirm with the IKO app → you land back in Skarb and the first sync starts.
 
+   The iPhone app does the same from **Settings → Other bank**, with the same redirect URL —
+   register `https://<your server>/settings` once and both clients use it. The bank opens in a
+   private browser sheet; when it sends you back, the web page sees that the app started this
+   authorization (the server prefixes the OAuth state with `app:`) and hands it to the app, which
+   finishes the link. The private key can be pasted or imported from the Files app.
+
 ### What to expect
 
 - Consent is PSD2-standard: **~90 days**, then the bank asks you to re-authorize
   (Skarb shows the expiry date on the connection card — just click the bank again when it lapses).
+  In the iPhone app, **Renew bank access** on the connection re-authorizes the same connection:
+  its accounts and history stay, and the card offers it from two weeks before the consent ends.
 - SCA happens in the IKO mobile app during authorization.
 - First sync pulls up to 90 days of history; PSD2 rate limits (typically 4 unattended
   calls/day per account) are far above Skarb's 30-minute cycle needs.

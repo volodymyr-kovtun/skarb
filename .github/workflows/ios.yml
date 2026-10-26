@@ -1,0 +1,66 @@
+name: iOS
+
+# The iPhone client has no tooling on Linux, so this is the only place it gets compiled before
+# someone opens Xcode. Path-filtered: a backend or web change never pays for a macOS runner.
+on:
+  push:
+    paths: ['ios/**', '.github/workflows/ios.yml']
+  pull_request:
+    paths: ['ios/**', '.github/workflows/ios.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Select the newest Xcode 26
+        run: |
+          ls -d /Applications/Xcode*.app
+          XCODE="$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Pick a simulator
+        id: sim
+        run: |
+          # The runner image decides which iPhones exist; take the newest one rather than
+          # pinning a model name that the next image update removes.
+          UDID="$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          ios = sorted((k for k in devices if "iOS" in k), key=lambda k: [int(p) for p in k.rsplit("iOS-", 1)[1].split("-")])
+          phones = [d for d in devices[ios[-1]] if d["name"].startswith("iPhone")]
+          print(phones[-1]["udid"])
+          ')"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          xcrun simctl list devices available | grep "$UDID"
+
+      - name: Build and run the unit tests
+        working-directory: ios
+        run: |
+          set +e
+          xcodebuild test \
+            -project Skarb.xcodeproj -scheme Skarb \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            CODE_SIGNING_ALLOWED=NO > build.log 2>&1
+          status=$?
+          # The full log is thousands of lines of compiler invocations; the job page only needs
+          # the diagnostics and the test verdicts. The whole log is uploaded below on failure.
+          grep -E '(error:|warning:|\*\* (BUILD|TEST)|✘|Test run with|failed|passed after)' build.log \
+            | grep -v '^ld: warning' | sort -u | head -300
+          exit $status
+
+      - name: Upload the build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-log
+          path: ios/build.log

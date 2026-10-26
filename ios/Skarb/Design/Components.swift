@@ -236,6 +236,28 @@ struct Money: View {
     }
 }
 
+/// A balance — what is held right now — which answers to the hide-balances switch. Earned, spent
+/// and every transaction use `Money` instead and stay legible either way: those are what the
+/// screens are for, and hiding them would make the mask cost more than it saves.
+struct BalanceText: View {
+    let amount: Decimal
+    let currency: String
+    var font: Font = .system(size: 14.5, weight: .semibold)
+    var color: Color = Palette.ink
+
+    @AppStorage(Prefs.showBalancesKey) private var shown = false
+
+    var body: some View {
+        Text(Format.balance(amount, currency, shown: shown))
+            .font(font)
+            .monospacedDigit()
+            .foregroundStyle(color)
+            .contentTransition(.numericText())
+            .animation(.smooth(duration: 0.2), value: shown)
+            .accessibilityLabel(shown ? Format.money(amount, currency) : "Hidden balance")
+    }
+}
+
 /// The full-screen "nothing here" note every list falls back to.
 struct EmptyNote: View {
     let text: String

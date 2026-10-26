@@ -35,6 +35,17 @@ nonisolated enum Format {
         return sign + body
     }
 
+    /// Wide enough to read as a redaction, narrow enough that revealing a row barely moves it.
+    static let hiddenBalance = "••••••"
+
+    /// `money` that answers to the hide-balances switch. Every *balance* on screen — what is
+    /// held right now — prints through this; what a window earned or spent never does.
+    static func balance(
+        _ amount: Decimal, _ currency: String, shown: Bool, signed: Bool = false, decimals: Int = 2
+    ) -> String {
+        shown ? money(amount, currency, signed: signed, decimals: decimals) : hiddenBalance
+    }
+
     /// A rounded figure for axis ticks and "all time" footers: 12.4k rather than 12,431.00.
     static func compact(_ amount: Decimal) -> String {
         let value = abs((amount as NSDecimalNumber).doubleValue)
@@ -136,9 +147,18 @@ nonisolated enum Format {
     }
 
     /// "synced 4 min ago" — how a connection reports when it last ran.
-    static func relative(_ date: Date) -> String {
+    static func relative(_ date: Date, to now: Date = Date()) -> String {
         let f = RelativeDateTimeFormatter()
         f.unitsStyle = .short
-        return f.localizedString(for: date, relativeTo: Date())
+        f.locale = Locale(identifier: "en_US")
+        return f.localizedString(for: date, relativeTo: now)
+    }
+
+    /// "12 Jan 2027" — a consent's end, a statement's day.
+    static func shortDate(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "d MMM yyyy"
+        f.locale = Locale(identifier: "en_US")
+        return f.string(from: date)
     }
 }

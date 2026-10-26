@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Lets a branch be checked before it has a pull request — the only way to run the backend
+  # tests from an environment without the .NET SDK.
+  workflow_dispatch:
 
 jobs:
   build:

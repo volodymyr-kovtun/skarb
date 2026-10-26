@@ -124,12 +124,12 @@ pages tighten to the screen, so a mobile browser is a first-class way to use Ska
 [`ios/`](ios/README.md) is a native SwiftUI client for the same API — the same sign-in, the
 same session cookie, the same endpoints, so the two clients can't disagree about what your
 money did. It mirrors the web's five pages as five tabs, in Skarb's palette and Apple's
-Liquid Glass chrome, and needs iOS 26. Open `ios/Skarb.xcodeproj` and run; point it at your
-instance from **Settings → Server**. [ios/TESTFLIGHT.md](ios/TESTFLIGHT.md) covers getting it
-onto a phone — the free seven-day route, and the Apple Developer Program plus TestFlight.
-
-Linking a bank through Enable Banking and importing a CSV stay on the web — both are one-time
-desktop errands, and the app says so rather than pretending otherwise.
+Liquid Glass chrome, and needs iOS 26. Everything the web does, the app does: bulk edits, cash
+wallets and what an ATM really paid out, hidden balances, linking any Enable Banking bank (and
+renewing its consent), Monobank's instant-sync webhook, CSV import from Files, and claiming a
+fresh instance. Open `ios/Skarb.xcodeproj` and run; point it at your instance from
+**Settings → Server**. [ios/TESTFLIGHT.md](ios/TESTFLIGHT.md) covers getting it onto a phone —
+the free seven-day route, and the Apple Developer Program plus TestFlight.
 
 ## Connecting your banks
 
@@ -164,9 +164,13 @@ frontend/src/
   shared/             typed api client, UI primitives, Layout
   features/           dashboard/ transactions/ accounts/ categories/ settings/
 ios/Skarb/
-  Core/               typed api client, models, app state, formatting
+  App/                composition root (AppContainer) — the only place an implementation is chosen
+  Core/               HTTP client, API models, one service protocol per area, shared stores
+  Domain/             pure decisions (filters, cash corrections, bulk edits, report slices)
   Design/             the palette and color band, ported from index.css / color.ts
-  Features/           auth/ overview/ transactions/ accounts/ categories/ settings/
+  Features/           overview/ transactions/ accounts/ categories/ settings/ auth/ — views
+                      and one view model per screen
+ios/SkarbTests/       Swift Testing: Domain and view models over a recording HTTP stub
 ```
 
 Key seams:

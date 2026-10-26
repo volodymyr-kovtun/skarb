@@ -6,6 +6,17 @@ All notable changes to Skarb are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- **On the iPhone, a mistyped current password no longer signs you out.** The server answers it
+  with a 401, and the app treated every 401 as an expired session. A 401 now makes the app ask
+  the server whether the session is still alive, as the web does, and only signs out when it isn't.
+- **Opening an income transaction on the iPhone no longer drops its category.** Switching the
+  editor to *Money in* as it loaded cleared the category picked for the other direction — the
+  transaction's own — so saving any edit filed it as uncategorized.
+- **A rule added on the iPhone's Rules screen files new transactions only**, as on the web and
+  as the screen says. It used to re-file existing matches too, silently and with no undo.
+- **`skarb://` links reach the iPhone app.** It handled them but never registered the scheme.
+  Its transaction list also keeps the rows on screen while it reloads, instead of blanking after
+  every edit.
 - **ZEN statements import as ZEN wrote them, and money moving between your wallets stops
   counting as spending.** The *ZEN.com statement* preset pointed at columns the current export
   doesn't have (amount in column 1 is the transaction type) and choked on the block of account
@@ -104,14 +115,30 @@ All notable changes to Skarb are documented here. The format follows
 - **Skarb for iPhone** ([ios/](ios/README.md)) — a native SwiftUI client on the same API,
   with the same password + TOTP sign-in and the same `skarb.session` cookie, so nothing is
   duplicated server-side. The web's five pages become five tabs behind an iOS 26 Liquid Glass
-  tab bar: the overview (net worth, currency switcher, report window, the spending ring by
-  category / account / tag, cashflow, accounts by institution, recent activity), the
-  transaction list with every filter and the rule offer that follows a hand-made category
-  change, the account editor including low-balance Telegram alerts, categories / tags / rules,
-  and settings (connections, Monobank connect, notifications, security, appearance, server
-  address). The palette and the per-theme color band are ported from `index.css` and
-  `color.ts` rather than re-picked, so the two clients can only drift on purpose. Enable
-  Banking onboarding and CSV import deliberately stay on the web, and the app points there.
+  tab bar, and **everything the web does, the app does**:
+  - the overview (net worth with the hide-balances eye, currency switcher, report window, the
+    spending ring by category / account / tag, cashflow, accounts by institution, recent activity);
+  - the transaction list with every filter, the rule offer that follows a hand-made category
+    change, and **bulk edit** — *Select* or long-press, *Select day*, *Select all N*, and a glass
+    bar in place of the tab bar that files, tags, marks internal or excludes the selection, with
+    *Undo* on a category change;
+  - **cash wallets** (one per currency, *Add currency*, or a manual account made into one), the
+    *Cash you received* correction on a withdrawal with today's-rate estimate, and rows that say
+    where a withdrawal's cash went and what a payment abroad or an exchange was worth;
+  - the account editor including low-balance Telegram alerts; categories, tags and rules;
+  - every connection flow: Monobank by token and its **instant-sync webhook**, **any Enable
+    Banking bank** — with **Renew bank access** on the same connection when the consent runs out —
+    and **CSV import** from Files with the ZEN, PKO and generic presets;
+  - **first-run setup**: the setup token, an authenticator link or QR code, and the recovery codes;
+  - `skarb://transactions?account=…&tags=…` links, which open the Activity tab on that filter.
+
+  Enable Banking needs no new redirect URL: the app uses the web's `/settings` one, the server
+  marks the app's authorizations in the OAuth state (`client=app` → `app:<connection>`), and the
+  web page hands those straight back to the app, which finishes the link with its own session.
+  The palette and the per-theme color band are ported from `index.css` and `color.ts` rather
+  than re-picked, so the two clients can only drift on purpose. Under the hood the app is
+  services behind protocols, one view model per screen and a pure `Domain` layer, with a Swift
+  Testing suite; a new **iOS workflow** builds it and runs the tests on every change to `ios/`.
 - Initial public release.
 - **Authentication.** Single-owner sign-in with password (PBKDF2-HMAC-SHA512) and mandatory
   TOTP two-factor, plus eight single-use recovery codes. First-run setup is gated by a setup

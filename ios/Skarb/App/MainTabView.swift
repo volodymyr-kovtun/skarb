@@ -7,43 +7,33 @@ import SwiftUI
 /// That is the platform's own material, so the app asks for the behaviour and lets the
 /// system do the drawing rather than faking glass with a blur.
 struct MainTabView: View {
-    @Environment(AppModel.self) private var model
-    /// Reopen on the tab you left — a ledger you check twice a day shouldn't reset to the
-    /// overview every time.
-    @AppStorage("skarb.tab") private var selection: Destination = .overview
-
-    enum Destination: String, Hashable {
-        case overview, transactions, accounts, categories, settings
-    }
+    @Environment(AppContainer.self) private var app
+    @Environment(AppRouter.self) private var router
+    @Environment(ToastCenter.self) private var toasts
 
     var body: some View {
-        @Bindable var model = model
-        TabView(selection: $selection) {
-            Tab("Overview", systemImage: "chart.pie", value: .overview) {
-                OverviewScreen()
+        @Bindable var router = router
+        TabView(selection: $router.tab) {
+            Tab("Overview", systemImage: "chart.pie", value: AppRouter.Destination.overview) {
+                OverviewScreen(model: app.makeOverview())
             }
-            Tab("Activity", systemImage: "list.bullet", value: .transactions) {
-                TransactionsScreen()
+            Tab("Activity", systemImage: "list.bullet", value: AppRouter.Destination.transactions) {
+                TransactionsScreen(model: app.makeTransactions())
             }
-            Tab("Accounts", systemImage: "building.columns", value: .accounts) {
+            Tab("Accounts", systemImage: "building.columns", value: AppRouter.Destination.accounts) {
                 AccountsScreen()
             }
-            Tab("Categories", systemImage: "square.grid.2x2", value: .categories) {
-                CategoriesScreen()
+            Tab("Categories", systemImage: "square.grid.2x2", value: AppRouter.Destination.categories) {
+                CategoriesScreen(model: app.makeCategories())
             }
-            Tab("Settings", systemImage: "gearshape", value: .settings) {
-                SettingsScreen()
+            Tab("Settings", systemImage: "gearshape", value: AppRouter.Destination.settings) {
+                SettingsScreen(model: app.makeSettings())
             }
         }
         // The bar tucks itself away as you read down a long list of transactions and comes
         // back the moment you scroll up.
         .tabBarMinimizeBehavior(.onScrollDown)
-        .toastOverlay(model.toast) { model.dismissToast() }
-        .onOpenURL { url in
-            // Deep links from a slice of the spending ring: skarb://transactions?account=…
-            guard url.scheme == "skarb", url.host() == "transactions" else { return }
-            selection = .transactions
-        }
+        .toastOverlay(toasts)
     }
 }
 
@@ -52,13 +42,11 @@ struct MainTabView: View {
 /// A one-line note that slides in above the tab bar and leaves on its own. It rides on the
 /// same glass as the bar so it reads as part of the chrome rather than a banner over content.
 private struct ToastOverlay: ViewModifier {
-    let toast: AppModel.Toast?
-    let dismiss: () -> Void
-    @Environment(AppModel.self) private var model
+    let toasts: ToastCenter
 
     func body(content: Content) -> some View {
         content.overlay(alignment: .bottom) {
-            if let toast {
+            if let toast = toasts.current {
                 HStack(spacing: 10) {
                     Image(systemName: toast.isError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
                         .foregroundStyle(toast.isError ? Palette.danger : Palette.income)
@@ -67,7 +55,7 @@ private struct ToastOverlay: ViewModifier {
                         .foregroundStyle(Palette.ink)
                         .lineLimit(3)
                     if let undoLabel = toast.undoLabel {
-                        Button(undoLabel) { Task { await model.runUndo() } }
+                        Button(undoLabel) { Task { await toasts.runUndo() } }
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(Palette.accent)
                             .buttonStyle(.plain)
@@ -77,38 +65,38 @@ private struct ToastOverlay: ViewModifier {
                 .padding(.vertical, 13)
                 .glassEffect(.regular, in: .capsule)
                 .padding(.horizontal, 20)
-                .padding(.bottom, 96)
+                .padding(.bottom, toasts.clearance)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
-                .onTapGesture(perform: dismiss)
+                .onTapGesture { toasts.dismiss() }
+                .sensoryFeedback(toast.isError ? .error : .success, trigger: toast.id)
                 .task(id: toast.id) {
-                    // Long enough to read a count and reach for Undo, short enough not to linger.
-                    let seconds: Double = toast.undoLabel != nil ? 9 : (toast.isError ? 5 : 2.5)
-                    try? await Task.sleep(for: .seconds(seconds))
-                    dismiss()
+                    try? await Task.sleep(for: toast.lifetime)
+                    guard !Task.isCancelled, toasts.current?.id == toast.id else { return }
+                    toasts.dismiss()
                 }
             }
         }
-        .animation(.smooth(duration: 0.3), value: toast)
+        .animation(.smooth(duration: 0.3), value: toasts.current)
     }
 }
 
 extension View {
-    func toastOverlay(_ toast: AppModel.Toast?, dismiss: @escaping () -> Void) -> some View {
-        modifier(ToastOverlay(toast: toast, dismiss: dismiss))
+    func toastOverlay(_ toasts: ToastCenter) -> some View {
+        modifier(ToastOverlay(toasts: toasts))
     }
 }
 
 // MARK: - Screen chrome
 
-/// The scaffolding every tab shares: the paper background, a large title, and the sync and
-/// theme controls in the toolbar.
+/// The scaffolding most tabs share: the paper background, a large title, and the sync control
+/// in the toolbar.
 struct SkarbScreen<Content: View, Extra: ToolbarContent>: View {
     private let title: String
     private let showsSync: Bool
     private let content: Content
     private let extraToolbar: Extra
 
-    @Environment(AppModel.self) private var model
+    @Environment(LedgerStore.self) private var ledger
 
     /// `extraToolbar` takes a value rather than a `@ToolbarContentBuilder` closure on purpose:
     /// the builder only ever yields an opaque type, which a stored generic can't name. One
@@ -144,7 +132,7 @@ struct SkarbScreen<Content: View, Extra: ToolbarContent>: View {
                 }
                 extraToolbar
             }
-            .refreshable { await model.invalidate() }
+            .refreshable { await ledger.invalidate() }
         }
     }
 }
@@ -165,18 +153,18 @@ extension SkarbScreen where Extra == NoToolbar {
 
 /// "Sync now", and the spinner that says it is running.
 struct SyncButton: View {
-    @Environment(AppModel.self) private var model
+    @Environment(SyncMonitor.self) private var sync
 
     var body: some View {
         Button {
-            Task { await model.syncNow() }
+            Task { await sync.syncAll() }
         } label: {
             Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
-                .symbolEffect(.rotate, options: .repeat(.continuous), isActive: model.isSyncing)
+                .symbolEffect(.rotate, options: .repeat(.continuous), isActive: sync.isSyncing)
         }
-        .disabled(model.isSyncing)
-        .accessibilityLabel(model.isSyncing
-            ? "Syncing \(model.syncRunning.joined(separator: ", "))"
+        .disabled(sync.isSyncing)
+        .accessibilityLabel(sync.isSyncing
+            ? "Syncing \(sync.running.joined(separator: ", "))"
             : "Sync every connected bank now")
     }
 }

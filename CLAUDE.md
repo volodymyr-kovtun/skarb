@@ -3,7 +3,8 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 Skarb is a self-hosted, **single-owner** personal finance app: .NET 10 minimal-API backend
-(`backend/Skarb.Api`), React 19 + Vite + Tailwind 4 SPA (`frontend`), PostgreSQL 17. The API
+(`backend/Skarb.Api`), React 19 + Vite + Tailwind 4 SPA (`frontend`), PostgreSQL 17, and a
+native SwiftUI iPhone client on the same API (`ios/`). The API
 serves the built SPA from its own `wwwroot`, so there is one process and one Docker image.
 README.md covers features and user-facing setup; `docs/` holds the bank, alert and deployment
 guides; `docs/BACKLOG.md` is the list of unbuilt ideas; `CHANGELOG.md` follows Keep a Changelog.
@@ -128,6 +129,30 @@ Vertical slices over a small shared kernel. `Program.cs` is the only composition
   (`shared/period.ts`, `shared/currency.ts`) persisted in localStorage.
 - TypeScript is strict-ish (`noUnusedLocals`, `noUnusedParameters`, `verbatimModuleSyntax`):
   `tsc -b` failing is a CI failure.
+
+## iOS client
+
+`ios/Skarb.xcodeproj` (Swift 6, main-actor default isolation, iOS 26, no dependencies). Files under
+`ios/Skarb/` and `ios/SkarbTests/` are picked up by synchronized folders — no project edits to add
+one. There is no Swift toolchain on Linux: `.github/workflows/ios.yml` builds and runs the tests
+on macOS for every push touching `ios/`, and is the compile check.
+
+- **Layers.** `Core/Services` has one `@MainActor` protocol per area with a `Live…` implementation
+  over `HTTPClient`; `App/AppContainer` is the only place implementations are chosen (no
+  singletons). Each screen/sheet has an `@Observable` view model built by a `make…` factory in an
+  `extension AppContainer` next to the feature. Rules go in `Domain/` as `nonisolated` pure code.
+- **Parity.** `Core/Models` mirrors `frontend/src/shared/api.ts` by hand — a field added to a DTO
+  goes into `Dtos.cs`, `api.ts` and the Swift model together. `Domain/CSVImport.swift` mirrors
+  `CSV_PRESETS`. A web feature is not done until the app has it.
+- **Auth.** Every 401 calls `SessionStore.revalidate()`, which signs out only when `/api/auth/session`
+  agrees; don't sign out on a 401 directly (a wrong current password is one).
+- **Enable Banking from the app** reuses the web's `/settings` redirect: `client=app` makes the
+  server prefix the OAuth state with `app:` (`EnableBankingState`), and `frontend/src/shared/appHandoff.ts`
+  forwards such a redirect to `skarb://enablebanking` before the SPA renders. Keep the three in step.
+- **Tests** (`ios/SkarbTests`, Swift Testing, snake-case sentence names) cover `Domain` and view
+  models over `StubHTTPClient`, which records each request's path, query and JSON body. In test
+  files write `Skarb.Category` / `Skarb.Tag` — the bare names clash with the ObjC runtime and
+  Swift Testing.
 
 ## Tests
 

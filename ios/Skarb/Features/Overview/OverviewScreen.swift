@@ -1,45 +1,61 @@
 import SwiftUI
 
+@Observable
+final class OverviewModel {
+    private(set) var data: Dashboard?
+    private(set) var error: String?
+    var breakdown: Breakdown = .category
+
+    private let service: any LedgerService
+
+    init(service: any LedgerService) {
+        self.service = service
+    }
+
+    func load(currency: String, period: PeriodKey) async {
+        do {
+            data = try await service.dashboard(currency: currency.isEmpty ? nil : currency, period: period)
+            error = nil
+        } catch {
+            guard !error.isCancellation else { return }
+            // Keep the previous figures on screen while a switch is in flight; only a first load
+            // with nothing to show falls back to the message.
+            if data == nil { self.error = error.localizedDescription }
+        }
+    }
+}
+
+extension AppContainer {
+    func makeOverview() -> OverviewModel { OverviewModel(service: ledgerService) }
+}
+
 /// The overview: what everything adds up to, what the chosen window did to it, and where the
 /// money went. Same figures, same wording and the same window control as the web dashboard —
 /// stacked for a phone instead of spread across a grid.
 struct OverviewScreen: View {
-    @Environment(AppModel.self) private var model
+    @State private var model: OverviewModel
+    @Environment(LedgerStore.self) private var ledger
     @AppStorage(Prefs.currencyKey) private var currency = ""
     @AppStorage(Prefs.periodKey) private var period = PeriodKey.month
-
-    @State private var data: Dashboard?
-    @State private var breakdown: Breakdown = .category
-    @State private var error: String?
     @State private var openingTransactions: TransactionFilter?
 
-    enum Breakdown: String, Hashable, CaseIterable {
-        case category, account, tag
-
-        var label: String {
-            switch self {
-            case .category: "Categories"
-            case .account: "Accounts"
-            case .tag: "Tags"
-            }
-        }
-    }
+    init(model: OverviewModel) { _model = State(initialValue: model) }
 
     var body: some View {
         SkarbScreen(title: "Overview") {
-            if let data {
+            if let data = model.data {
                 content(data)
-            } else if let error {
+            } else if let error = model.error {
                 Card { EmptyNote(text: error) }
             } else {
                 Card { EmptyNote(text: "Loading your money…") }
             }
         }
         // Reloads on the window, the currency, and after any mutation anywhere in the app.
-        .task(id: reloadKey) { await load() }
+        .task(id: "\(period.rawValue)|\(currency)|\(ledger.revision)") {
+            await model.load(currency: currency, period: period)
+        }
     }
-
-    private var reloadKey: String { "\(period.rawValue)|\(currency)|\(model.revision)" }
 
     @ViewBuilder
     private func content(_ data: Dashboard) -> some View {
@@ -56,15 +72,12 @@ struct OverviewScreen: View {
         // moves it. The dates are spelled out because the pill alone doesn't say whether
         // "this month" means the whole of it.
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 4) {
-                    MicroLabel(data.period.key.name)
-                    Text(Format.range(data.period.start, data.period.end))
-                        .font(.system(size: 13.5))
-                        .monospacedDigit()
-                        .foregroundStyle(Palette.muted)
-                }
-                Spacer()
+            VStack(alignment: .leading, spacing: 4) {
+                MicroLabel(data.period.key.name)
+                Text(Format.range(data.period.start, data.period.end))
+                    .font(.system(size: 13.5))
+                    .monospacedDigit()
+                    .foregroundStyle(Palette.muted)
             }
             SegmentedPills(
                 options: PeriodKey.allCases.map { ($0, $0.short) },
@@ -72,31 +85,17 @@ struct OverviewScreen: View {
                 accessibilityLabel: "Report over")
         }
         .padding(.horizontal, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
 
         StatGrid(data: data)
 
-        SpendingCard(data: data, breakdown: $breakdown) { filter in
-            openingTransactions = filter
-        }
+        SpendingCard(data: data, breakdown: $model.breakdown) { openingTransactions = $0 }
 
-        CashflowCard(months: data.cashflow, currency: data.currency)
+        CashflowCard(months: data.cashflow)
 
         AccountsSummaryCard(rows: data.accounts, currency: data.currency)
 
         RecentActivityCard(recent: data.recent)
-    }
-
-    private func load() async {
-        do {
-            data = try await APIClient.shared.dashboard(
-                currency: currency.isEmpty ? nil : currency, period: period)
-            error = nil
-        } catch {
-            model.handle(error)
-            // Keep the previous figures on screen while a switch is in flight; only a first
-            // load with nothing to show falls back to the message.
-            if data == nil { self.error = error.localizedDescription }
-        }
     }
 }
 
@@ -109,22 +108,20 @@ private struct NetWorthCard: View {
     var body: some View {
         Card {
             VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .center, spacing: 12) {
+                HStack(alignment: .center, spacing: 10) {
                     MicroLabel("Net worth")
+                    BalanceToggle()
                     Spacer(minLength: 8)
                     if data.availableCurrencies.count > 1 {
                         SegmentedPills(
                             options: data.availableCurrencies.map { ($0, $0) },
                             selection: $currency,
                             accessibilityLabel: "Display currency")
-                            .frame(maxWidth: 190)
+                            .frame(maxWidth: 170)
                     }
                 }
 
-                Text(Format.money(data.netWorth, data.currency))
-                    .font(.display(42))
-                    .monospacedDigit()
-                    .foregroundStyle(Palette.ink)
+                BalanceText(amount: data.netWorth, currency: data.currency, font: .display(42))
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
                     .padding(.top, 12)
@@ -135,6 +132,8 @@ private struct NetWorthCard: View {
                     .lineSpacing(2)
                     .padding(.top, 10)
 
+                // The curve stays drawn while balances are hidden: with no axis on it, the shape
+                // says how the months went without saying what they came to.
                 NetWorthTrend(data: data)
                     .padding(.top, 16)
             }
@@ -173,19 +172,20 @@ private struct StatGrid: View {
 
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
             StatTile(
-                label: "Earned", value: data.totals.income, previous: data.previous.income,
-                currency: cur, tone: Palette.income, compare: shown.comparison, compareTitle: comparedWith)
+                label: "Earned", value: data.totals.income, currency: cur, tone: Palette.income,
+                subtitle: PeriodComparison.subtitle(value: data.totals.income, previous: data.previous.income, period: shown),
+                hint: comparedWith)
             StatTile(
-                label: "Spent", value: data.totals.expense, previous: data.previous.expense,
-                currency: cur, tone: Palette.spend, compare: shown.comparison, compareTitle: comparedWith)
+                label: "Spent", value: data.totals.expense, currency: cur, tone: Palette.spend,
+                subtitle: PeriodComparison.subtitle(value: data.totals.expense, previous: data.previous.expense, period: shown),
+                hint: comparedWith)
             StatTile(
-                label: "Invested", value: data.totals.invested, previous: nil,
-                currency: cur, tone: Palette.accent,
-                footer: "\(Format.money(data.allTimeInvested, cur, decimals: 0)) all time")
+                label: "Invested", value: data.totals.invested, currency: cur, tone: Palette.accent,
+                subtitle: "\(Format.money(data.allTimeInvested, cur, decimals: 0)) all time")
             StatTile(
-                label: "Net", value: data.totals.net, previous: nil, currency: cur,
+                label: "Net", value: data.totals.net, currency: cur,
                 tone: data.totals.net >= 0 ? Palette.income : Palette.ink,
-                footer: "after spending & investing", signed: true)
+                subtitle: "after spending & investing", signed: true)
         }
     }
 }
@@ -193,14 +193,11 @@ private struct StatGrid: View {
 private struct StatTile: View {
     let label: String
     let value: Decimal
-    var previous: Decimal?
     let currency: String
     let tone: Color
-    /// How the comparison window relates to this one — "on the same days last month".
-    var compare: String?
+    let subtitle: String
     /// The comparison window's own dates, for anyone who wants them exactly.
-    var compareTitle: String?
-    var footer: String?
+    var hint: String?
     var signed = false
 
     var body: some View {
@@ -224,16 +221,6 @@ private struct StatTile: View {
             .padding(.vertical, 16)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityHint(compareTitle ?? "")
-    }
-
-    /// The window behind this percentage runs exactly as long as the one above it, so a month
-    /// three weeks in is not read against a whole one and reported as a collapse.
-    private var subtitle: String {
-        if let footer { return footer }
-        guard let previous, previous > 0, let compare else { return "nothing to compare with" }
-        let diff = ((value - previous) / previous) * 100
-        let magnitude = abs((diff as NSDecimalNumber).doubleValue).rounded()
-        return "\(diff >= 0 ? "+" : "−")\(Int(magnitude))% \(compare)"
+        .accessibilityHint(hint ?? "")
     }
 }

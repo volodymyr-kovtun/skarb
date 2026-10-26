@@ -20,6 +20,22 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!--
+	  skarb://transactions?account=… opens the Activity tab on a filter, and
+	  skarb://enablebanking?… is how a bank authorization comes home (see
+	  Domain/EnableBankingHandoff.swift).
+	-->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>app.subero.skarb</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>skarb</string>
+			</array>
+		</dict>
+	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>UILaunchScreen</key>

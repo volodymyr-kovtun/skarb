@@ -19,7 +19,7 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Select the newest Xcode 26
         run: |
@@ -43,18 +43,19 @@ jobs:
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
           xcrun simctl list devices available | grep "$UDID"
 
-      - name: Build
+      - name: Build and run the unit tests
         working-directory: ios
         run: |
           set +e
-          xcodebuild build \
+          xcodebuild test \
             -project Skarb.xcodeproj -scheme Skarb \
             -destination "id=${{ steps.sim.outputs.udid }}" \
             CODE_SIGNING_ALLOWED=NO > build.log 2>&1
           status=$?
           # The full log is thousands of lines of compiler invocations; the job page only needs
-          # the diagnostics. The whole log is uploaded below when something fails.
-          grep -E '(error:|warning:|\*\* BUILD)' build.log | grep -v '^ld: warning' | sort -u | head -300
+          # the diagnostics and the test verdicts. The whole log is uploaded below on failure.
+          grep -E '(error:|warning:|\*\* (BUILD|TEST)|✘|Test run with|failed|passed after)' build.log \
+            | grep -v '^ld: warning' | sort -u | head -300
           exit $status
 
       - name: Upload the build log

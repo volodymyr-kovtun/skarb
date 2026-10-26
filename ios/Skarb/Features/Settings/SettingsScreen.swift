@@ -1,22 +1,80 @@
 import SwiftUI
 
-/// Connections, alerts, security and appearance.
-///
-/// Two of the web's flows deliberately aren't here: linking a bank through Enable Banking
-/// (an OAuth round trip that wants a private key pasted in) and the CSV importer. Both are
-/// one-time desktop errands, and the screen says where to do them rather than pretending.
-struct SettingsScreen: View {
-    @Environment(AppModel.self) private var model
-    @AppStorage(Prefs.themeKey) private var theme = ThemeMode.system
+@Observable
+final class SettingsModel {
+    private(set) var connections: [Connection] = []
 
-    @State private var connections: [Connection] = []
-    @State private var logs: [SyncStatus.LogEntry] = []
-    @State private var connectingMonobank = false
-    @State private var renaming: Connection?
+    private let service: any ConnectionService
+    private let monitor: SyncMonitor
+    private let actions: ActionRunner
+
+    init(service: any ConnectionService, monitor: SyncMonitor, actions: ActionRunner) {
+        self.service = service
+        self.monitor = monitor
+        self.actions = actions
+    }
+
+    func load() async {
+        if let fresh = try? await service.connections() { connections = fresh }
+        await monitor.refresh()
+    }
+
+    func sync(_ connection: Connection, full: Bool) async {
+        await monitor.sync(connection, full: full)
+        await load()
+    }
+
+    func remove(_ connection: Connection) async {
+        await actions.perform("Connection removed") { try await service.delete(connection.id) }
+        await load()
+    }
+
+    func restoreIgnored(_ connection: Connection) async {
+        await actions.perform("Accounts restored — they return on the next sync") {
+            _ = try await service.restoreIgnoredAccounts(connection.id)
+        }
+        await load()
+    }
+}
+
+extension AppContainer {
+    func makeSettings() -> SettingsModel { SettingsModel(service: connections, monitor: sync, actions: actions) }
+}
+
+/// Connections, imports, alerts, security and appearance — the instance-wide plumbing. Settings
+/// for one account or one category live in that thing's own editor, as on the web.
+struct SettingsScreen: View {
+    /// Everything this screen can open on top of itself.
+    private enum Sheet: Identifiable {
+        case monobank, enableBanking, csvImport, server
+        case renew(Connection), rename(Connection), webhook(Connection)
+
+        var id: String {
+            switch self {
+            case .monobank: "monobank"
+            case .enableBanking: "enableBanking"
+            case .csvImport: "csvImport"
+            case .server: "server"
+            case .renew(let c): "renew-\(c.id)"
+            case .rename(let c): "rename-\(c.id)"
+            case .webhook(let c): "webhook-\(c.id)"
+            }
+        }
+    }
+
+    @State private var model: SettingsModel
+    @State private var sheet: Sheet?
     @State private var confirmingDelete: Connection?
     @State private var confirmingRestore: Connection?
-    @State private var showingServer = false
     @State private var confirmingSignOut = false
+
+    @Environment(AppContainer.self) private var app
+    @Environment(SessionStore.self) private var session
+    @Environment(SyncMonitor.self) private var sync
+    @Environment(LedgerStore.self) private var ledger
+    @AppStorage(Prefs.themeKey) private var theme = ThemeMode.system
+
+    init(model: SettingsModel) { _model = State(initialValue: model) }
 
     var body: some View {
         SkarbScreen(title: "Settings") {
@@ -25,7 +83,7 @@ struct SettingsScreen: View {
 
             Card {
                 VStack(spacing: 0) {
-                    NavigationLink { NotificationsScreen() } label: {
+                    NavigationLink { NotificationsScreen(model: app.makeNotifications()) } label: {
                         SettingsRow(
                             title: "Notifications",
                             subtitle: "Telegram alerts when an account runs low",
@@ -35,10 +93,10 @@ struct SettingsScreen: View {
 
                     Divider().padding(.leading, 54)
 
-                    NavigationLink { SecurityScreen() } label: {
+                    NavigationLink { SecurityScreen(model: app.makeSecurity()) } label: {
                         SettingsRow(
                             title: "Security",
-                            subtitle: signedInAs,
+                            subtitle: session.email ?? "Password, two-factor and recovery codes",
                             icon: "lock.shield") { DisclosureChevron() }
                     }
                     .buttonStyle(RowButtonStyle())
@@ -50,10 +108,10 @@ struct SettingsScreen: View {
 
             Card {
                 VStack(spacing: 0) {
-                    Button { showingServer = true } label: {
+                    Button { sheet = .server } label: {
                         SettingsRow(
                             title: "Server",
-                            subtitle: APIClient.shared.baseURL.absoluteString,
+                            subtitle: app.server.baseURL.absoluteString,
                             icon: "server.rack") { DisclosureChevron() }
                     }
                     .buttonStyle(RowButtonStyle())
@@ -78,46 +136,36 @@ struct SettingsScreen: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 4)
         }
-        .task(id: model.revision) { await load() }
-        .sheet(isPresented: $connectingMonobank) { MonobankSheet() }
-        .sheet(item: $renaming) { RenameConnectionSheet(connection: $0) }
-        .sheet(isPresented: $showingServer) { ServerSheet() }
-        .confirmationDialog(
-            deleteWarning, isPresented: .init(
-                get: { confirmingDelete != nil },
-                set: { if !$0 { confirmingDelete = nil } }),
-            titleVisibility: .visible
-        ) {
-            Button("Remove", role: .destructive) {
-                if let connection = confirmingDelete {
-                    Task {
-                        await model.perform("Connection removed") {
-                            try await APIClient.shared.deleteConnection(connection.id)
-                        }
-                        await load()
-                    }
-                }
+        .task(id: ledger.revision) { await model.load() }
+        .sheet(item: $sheet) { sheet in
+            switch sheet {
+            case .monobank: MonobankSheet(model: app.makeMonobank())
+            case .enableBanking: EnableBankingFlow(model: app.makeEnableBanking())
+            case .renew(let connection): EnableBankingFlow(model: app.makeEnableBanking(renewing: connection))
+            case .csvImport: CSVImportSheet(model: app.makeCSVImport())
+            case .rename(let connection): RenameConnectionSheet(model: app.makeRename(for: connection))
+            case .webhook(let connection): WebhookSheet(model: app.makeWebhook(for: connection))
+            case .server: ServerSheet()
             }
         }
         .confirmationDialog(
-            restoreWarning, isPresented: .init(
-                get: { confirmingRestore != nil },
-                set: { if !$0 { confirmingRestore = nil } }),
-            titleVisibility: .visible
+            confirmingDelete.map(ConnectionCopy.deleteWarning) ?? "",
+            isPresented: isPresent($confirmingDelete), titleVisibility: .visible
+        ) {
+            Button("Remove", role: .destructive) {
+                if let connection = confirmingDelete { Task { await model.remove(connection) } }
+            }
+        }
+        .confirmationDialog(
+            confirmingRestore.map(ConnectionCopy.restoreWarning) ?? "",
+            isPresented: isPresent($confirmingRestore), titleVisibility: .visible
         ) {
             Button("Bring back") {
-                if let connection = confirmingRestore {
-                    Task {
-                        await model.perform("Accounts restored — they return on the next sync") {
-                            try await APIClient.shared.restoreIgnoredAccounts(connection.id)
-                        }
-                        await load()
-                    }
-                }
+                if let connection = confirmingRestore { Task { await model.restoreIgnored(connection) } }
             }
         }
         .confirmationDialog("Sign out of Skarb?", isPresented: $confirmingSignOut, titleVisibility: .visible) {
-            Button("Sign out", role: .destructive) { Task { await model.signOut() } }
+            Button("Sign out", role: .destructive) { Task { await app.signOut() } }
         }
     }
 
@@ -130,24 +178,32 @@ struct SettingsScreen: View {
                     .font(.display(17))
                     .foregroundStyle(Palette.ink)
 
-                if connections.isEmpty {
-                    Text("Nothing connected yet. Link Monobank with a personal token below — for PKO BP and 2,500+ other European banks, use Enable Banking from the web app.")
+                if model.connections.isEmpty {
+                    Text("Nothing connected yet. Link Monobank with a personal token, or any of 2,500+ European banks (PKO BP included) through Enable Banking.")
                         .font(.system(size: 14))
                         .foregroundStyle(Palette.muted)
                         .lineSpacing(3)
                 } else {
-                    ForEach(connections) { connection in
+                    ForEach(model.connections) { connection in
                         connectionRow(connection)
                     }
                 }
 
-                Button("Connect Monobank") { connectingMonobank = true }
-                    .buttonStyle(.skarbPrimary)
+                HStack(spacing: 10) {
+                    Button { sheet = .monobank } label: { Label("Monobank", systemImage: "powerplug") }
+                    Button { sheet = .enableBanking } label: { Label("Other bank", systemImage: "building.columns") }
+                }
+                .buttonStyle(.skarbPrimary)
 
-                Text("Linking a bank through Enable Banking, and importing a CSV statement, both live in the web app at \(APIClient.shared.baseURL.host() ?? "your server") — they need a browser round trip and a file picker.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Palette.faint)
-                    .lineSpacing(2)
+                Button { sheet = .csvImport } label: {
+                    Label("Import a CSV statement (ZEN, …)", systemImage: "square.and.arrow.down")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Palette.muted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Palette.surface2, in: .capsule)
+                }
+                .buttonStyle(.plain)
             }
             .padding(20)
         }
@@ -173,7 +229,7 @@ struct SettingsScreen: View {
                             .lineLimit(1)
                         statusChip(connection.status)
                     }
-                    Text(connectionSubtitle(connection))
+                    Text(ConnectionCopy.subtitle(connection))
                         .font(.system(size: 12.5))
                         .foregroundStyle(Palette.faint)
                         .lineLimit(2)
@@ -181,25 +237,7 @@ struct SettingsScreen: View {
 
                 Spacer(minLength: 4)
 
-                Menu {
-                    Button {
-                        Task { await syncOne(connection, full: false) }
-                    } label: {
-                        Label("Sync now", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
-                    }
-                    Button {
-                        Task { await syncOne(connection, full: true) }
-                    } label: {
-                        Label("Full re-sync", systemImage: "clock.arrow.circlepath")
-                    }
-                    Button { renaming = connection } label: {
-                        Label("Rename", systemImage: "pencil")
-                    }
-                    Divider()
-                    Button(role: .destructive) { confirmingDelete = connection } label: {
-                        Label("Remove connection", systemImage: "trash")
-                    }
-                } label: {
+                Menu { connectionActions(connection) } label: {
                     Image(systemName: "ellipsis.circle")
                         .font(.system(size: 18))
                         .foregroundStyle(Palette.muted)
@@ -217,11 +255,18 @@ struct SettingsScreen: View {
                     .background(Palette.danger.opacity(0.1), in: .rect(cornerRadius: Palette.Radius.row))
             }
 
+            if ConnectionCopy.needsRenewal(connection) {
+                Button { sheet = .renew(connection) } label: {
+                    Label(connection.isLinked ? "Renew bank access" : "Finish linking", systemImage: "arrow.clockwise")
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(Palette.accent)
+                }
+                .buttonStyle(.plain)
+            }
+
             if connection.ignoredAccountCount > 0 {
                 HStack(spacing: 8) {
-                    Text(connection.ignoredAccountCount == 1
-                        ? "1 deleted account is kept out of sync."
-                        : "\(connection.ignoredAccountCount) deleted accounts are kept out of sync.")
+                    Text(ConnectionCopy.ignoredNote(connection))
                         .font(.system(size: 12))
                         .foregroundStyle(Palette.muted)
                     Button("Bring back") { confirmingRestore = connection }
@@ -238,6 +283,37 @@ struct SettingsScreen: View {
         .background(Palette.surface2, in: .rect(cornerRadius: Palette.Radius.row))
     }
 
+    @ViewBuilder
+    private func connectionActions(_ connection: Connection) -> some View {
+        Button {
+            Task { await model.sync(connection, full: false) }
+        } label: {
+            Label("Sync now", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
+        }
+        Button {
+            Task { await model.sync(connection, full: true) }
+        } label: {
+            Label("Full re-sync", systemImage: "clock.arrow.circlepath")
+        }
+        if connection.isMonobank {
+            Button { sheet = .webhook(connection) } label: {
+                Label("Instant sync (webhook)", systemImage: "bolt")
+            }
+        }
+        if connection.isEnableBanking {
+            Button { sheet = .renew(connection) } label: {
+                Label("Renew bank access", systemImage: "arrow.clockwise")
+            }
+        }
+        Button { sheet = .rename(connection) } label: {
+            Label("Rename", systemImage: "pencil")
+        }
+        Divider()
+        Button(role: .destructive) { confirmingDelete = connection } label: {
+            Label("Remove connection", systemImage: "trash")
+        }
+    }
+
     private func statusChip(_ status: String) -> some View {
         let color: Color = status == "linked" ? Palette.income
             : status == "error" ? Palette.danger : Palette.muted
@@ -249,41 +325,6 @@ struct SettingsScreen: View {
             .background(color.opacity(0.15), in: .capsule)
     }
 
-    private func connectionSubtitle(_ connection: Connection) -> String {
-        var parts = ["\(connection.accountCount) account\(connection.accountCount == 1 ? "" : "s")"]
-        if let synced = connection.lastSyncedAt { parts.append("synced \(Format.relative(synced))") }
-        if let until = connection.consentValidUntil {
-            parts.append("consent until \(until.formatted(date: .abbreviated, time: .omitted))")
-        }
-        return parts.joined(separator: " · ")
-    }
-
-    private var deleteWarning: String {
-        guard let connection = confirmingDelete else { return "" }
-        guard connection.accountCount > 0 else { return "Remove \(connection.displayName)?" }
-        let accounts = connection.accountCount == 1
-            ? "Its 1 account" : "Its \(connection.accountCount) accounts"
-        return "Remove \(connection.displayName)? \(accounts) and every transaction on them will be deleted. This cannot be undone."
-    }
-
-    private var restoreWarning: String {
-        guard let connection = confirmingRestore else { return "" }
-        let what = connection.ignoredAccountCount == 1 ? "it" : "them"
-        return "Bring \(what) back? The next sync recreates \(what) and re-fetches history from scratch."
-    }
-
-    private func syncOne(_ connection: Connection, full: Bool) async {
-        do {
-            try await APIClient.shared.syncOne(connection.id, full: full)
-            model.show(full ? "Full re-sync started" : "Syncing \(connection.displayName)…")
-            await model.refreshSyncStatus()
-            await load()
-        } catch {
-            model.handle(error)
-            model.show(error.localizedDescription, isError: true)
-        }
-    }
-
     // MARK: - Sync activity
 
     private var syncActivityCard: some View {
@@ -291,10 +332,10 @@ struct SettingsScreen: View {
             VStack(alignment: .leading, spacing: 0) {
                 CardHeader(title: "Sync activity")
 
-                if logs.isEmpty {
+                if sync.logs.isEmpty {
                     EmptyNote(text: "No syncs yet.")
                 } else {
-                    ForEach(logs.prefix(10)) { entry in
+                    ForEach(sync.logs.prefix(10)) { entry in
                         HStack(alignment: .top, spacing: 10) {
                             Image(systemName: entry.success ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                                 .font(.system(size: 14))
@@ -336,25 +377,13 @@ struct SettingsScreen: View {
         }
     }
 
-    private var signedInAs: String {
-        if case .signedIn(let email) = model.phase, let email { return email }
-        return "Password, two-factor and recovery codes"
-    }
-
     private var appVersion: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
         return "\(version) (\(build))"
     }
 
-    private func load() async {
-        do {
-            async let connections = APIClient.shared.connections()
-            async let status = APIClient.shared.syncStatus()
-            self.connections = try await connections
-            self.logs = try await status.logs
-        } catch {
-            model.handle(error)
-        }
+    private func isPresent<T>(_ value: Binding<T?>) -> Binding<Bool> {
+        Binding(get: { value.wrappedValue != nil }, set: { if !$0 { value.wrappedValue = nil } })
     }
 }

@@ -1,17 +1,99 @@
 import SwiftUI
 
+@Observable
+final class SecurityModel {
+    private(set) var remaining = 0
+    private let auth: any AuthService
+
+    init(auth: any AuthService) {
+        self.auth = auth
+    }
+
+    func load() async {
+        if let left = try? await auth.recoveryCodesLeft() { remaining = left }
+    }
+
+    func makeChangePassword() -> ChangePasswordModel { ChangePasswordModel(auth: auth) }
+    func makeRegenerate() -> RegenerateCodesModel { RegenerateCodesModel(auth: auth) }
+}
+
+@Observable
+final class ChangePasswordModel {
+    var current = ""
+    var next = ""
+    var confirmation = ""
+    private(set) var busy = false
+    private(set) var error: String?
+    private(set) var done = false
+
+    private let auth: any AuthService
+
+    init(auth: any AuthService) {
+        self.auth = auth
+    }
+
+    var canSubmit: Bool {
+        !busy && !current.isEmpty && CredentialPolicy.isLongEnough(next) && next == confirmation
+    }
+
+    func submit() async {
+        guard canSubmit else { return }
+        busy = true
+        error = nil
+        defer { busy = false }
+        do {
+            try await auth.changePassword(current: current, new: next)
+            current = ""
+            next = ""
+            confirmation = ""
+            done = true
+        } catch {
+            // "Current password is incorrect" arrives as a 401; the session re-check that every
+            // 401 triggers finds the session alive, so it stays a message here and nothing more.
+            self.error = error.localizedDescription
+        }
+    }
+}
+
+@Observable
+final class RegenerateCodesModel {
+    var password = ""
+    private(set) var codes: [String]?
+    private(set) var busy = false
+    private(set) var error: String?
+
+    private let auth: any AuthService
+
+    init(auth: any AuthService) {
+        self.auth = auth
+    }
+
+    func regenerate() async {
+        guard !busy, !password.isEmpty else { return }
+        busy = true
+        error = nil
+        defer { busy = false }
+        do {
+            codes = try await auth.newRecoveryCodes(currentPassword: password)
+            password = ""
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+}
+
+extension AppContainer {
+    func makeSecurity() -> SecurityModel { SecurityModel(auth: auth) }
+}
+
 /// Account security, as its own slice of Settings — nothing here touches bank connections.
 struct SecurityScreen: View {
-    @Environment(AppModel.self) private var model
-
-    @State private var remaining = 0
+    @State private var model: SecurityModel
     @State private var changingPassword = false
     @State private var regenerating = false
+    @Environment(SessionStore.self) private var session
 
-    private var email: String {
-        if case .signedIn(let email) = model.phase { return email ?? "—" }
-        return "—"
-    }
+    init(model: SecurityModel) { _model = State(initialValue: model) }
 
     var body: some View {
         ScrollView {
@@ -19,28 +101,25 @@ struct SecurityScreen: View {
                 Card {
                     VStack(spacing: 0) {
                         SettingsRow(title: "Signed in as") {
-                            Text(email)
+                            Text(session.email ?? "—")
                                 .font(.system(size: 13.5))
                                 .foregroundStyle(Palette.muted)
                                 .lineLimit(1)
                         }
                         Divider().padding(.leading, 16)
                         SettingsRow(title: "Two-factor") {
-                            HStack(spacing: 5) {
-                                Image(systemName: "checkmark.shield.fill")
-                                Text("Authenticator app")
-                            }
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Palette.income)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Palette.income.opacity(0.1), in: .capsule)
+                            Label("Authenticator app", systemImage: "checkmark.shield.fill")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Palette.income)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Palette.income.opacity(0.1), in: .capsule)
                         }
                         Divider().padding(.leading, 16)
                         SettingsRow(title: "Recovery codes") {
-                            Text("\(remaining) unused")
-                                .font(.system(size: 13.5, weight: remaining <= 2 ? .semibold : .regular))
-                                .foregroundStyle(remaining <= 2 ? Palette.danger : Palette.muted)
+                            Text("\(model.remaining) unused")
+                                .font(.system(size: 13.5, weight: model.remaining <= 2 ? .semibold : .regular))
+                                .foregroundStyle(model.remaining <= 2 ? Palette.danger : Palette.muted)
                                 .monospacedDigit()
                         }
                     }
@@ -72,212 +151,77 @@ struct SecurityScreen: View {
         .background(Palette.paper)
         .navigationTitle("Security")
         .navigationBarTitleDisplayMode(.inline)
-        .task { remaining = (try? await APIClient.shared.recoveryCodesLeft()) ?? 0 }
-        .sheet(isPresented: $changingPassword) { ChangePasswordSheet() }
-        .sheet(isPresented: $regenerating) {
-            RegenerateCodesSheet { remaining = (try? await APIClient.shared.recoveryCodesLeft()) ?? 0 }
+        .task { await model.load() }
+        .sheet(isPresented: $changingPassword) { ChangePasswordSheet(model: model.makeChangePassword()) }
+        .sheet(isPresented: $regenerating, onDismiss: { Task { await model.load() } }) {
+            RegenerateCodesSheet(model: model.makeRegenerate())
         }
     }
 }
 
 private struct ChangePasswordSheet: View {
-    @Environment(AppModel.self) private var model
+    @State private var model: ChangePasswordModel
     @Environment(\.dismiss) private var dismiss
 
-    /// Matches the server's floor, so a rejected password is a surprise rather than the norm.
-    private static let minimum = 12
-
-    @State private var current = ""
-    @State private var next = ""
-    @State private var confirmation = ""
-    @State private var busy = false
-    @State private var error: String?
-    @State private var done = false
-
-    private var canSubmit: Bool {
-        !busy && !current.isEmpty && next.count >= Self.minimum && next == confirmation
-    }
+    init(model: ChangePasswordModel) { _model = State(initialValue: model) }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Palette.paper.ignoresSafeArea()
-                ScrollView {
-                    if done {
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Password updated. Every other signed-in device has been signed out.")
-                                .font(.system(size: 14))
-                                .foregroundStyle(Palette.muted)
-                            Button("Done") { dismiss() }.buttonStyle(.skarbPrimary)
-                        }
-                        .padding(20)
-                    } else {
-                        VStack(alignment: .leading, spacing: 14) {
-                            secure("Current password", $current, content: .password)
-                            VStack(alignment: .leading, spacing: 5) {
-                                secure("New password", $next, content: .newPassword)
-                                Text("At least \(Self.minimum) characters.")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(Palette.faint)
-                            }
-                            secure("Confirm new password", $confirmation, content: .newPassword)
-                            if let error { FormError(error) }
-                            Button(busy ? "Saving…" : "Change password") { Task { await save() } }
-                                .buttonStyle(.skarbPrimary)
-                                .disabled(!canSubmit)
-                                .opacity(canSubmit ? 1 : 0.5)
-                        }
-                        .padding(20)
-                    }
+        SheetScaffold(title: "Change password") {
+            if model.done {
+                Text("Password updated. Every other signed-in device has been signed out.")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Palette.muted)
+                Button("Done") { dismiss() }.buttonStyle(.skarbPrimary)
+            } else {
+                secure("Current password", $model.current, content: .password)
+                VStack(alignment: .leading, spacing: 5) {
+                    secure("New password", $model.next, content: .newPassword)
+                    Footnote("At least \(CredentialPolicy.minimumPasswordLength) characters.")
                 }
-                .scrollDismissesKeyboard(.interactively)
-            }
-            .navigationTitle("Change password")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if !done {
-                    ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() } }
-                }
+                secure("Confirm new password", $model.confirmation, content: .newPassword)
+                if let error = model.error { FormError(error) }
+                Button(model.busy ? "Saving…" : "Change password") { Task { await model.submit() } }
+                    .buttonStyle(.skarbPrimary)
+                    .disabled(!model.canSubmit)
+                    .opacity(model.canSubmit ? 1 : 0.5)
             }
         }
     }
 
-    private func secure(
-        _ label: String, _ text: Binding<String>, content: UITextContentType
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Palette.muted)
-            SecureField("", text: text)
-                .textContentType(content)
-                .skarbField()
-        }
-    }
-
-    private func save() async {
-        busy = true
-        defer { busy = false }
-        error = nil
-        do {
-            try await APIClient.shared.changePassword(current: current, new: next)
-            current = ""
-            next = ""
-            confirmation = ""
-            done = true
-        } catch {
-            model.handle(error)
-            self.error = error.localizedDescription
+    private func secure(_ label: String, _ text: Binding<String>, content: UITextContentType) -> some View {
+        LabeledField(label) {
+            SecureField("", text: text).textContentType(content)
         }
     }
 }
 
 private struct RegenerateCodesSheet: View {
-    var onDone: () async -> Void
-
-    @Environment(AppModel.self) private var model
+    @State private var model: RegenerateCodesModel
     @Environment(\.dismiss) private var dismiss
 
-    @State private var password = ""
-    @State private var codes: [String]?
-    @State private var busy = false
-    @State private var error: String?
+    init(model: RegenerateCodesModel) { _model = State(initialValue: model) }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Palette.paper.ignoresSafeArea()
-                ScrollView {
-                    if let codes {
-                        VStack(alignment: .leading, spacing: 16) {
-                            RecoveryCodesView(codes: codes)
-                            Text("The previous set no longer works. Replace whatever copy you kept.")
-                                .font(.system(size: 12))
-                                .foregroundStyle(Palette.muted)
-                            Button("Done") {
-                                Task { await onDone() }
-                                dismiss()
-                            }
-                            .buttonStyle(.skarbPrimary)
-                        }
-                        .padding(20)
-                    } else {
-                        VStack(alignment: .leading, spacing: 14) {
-                            Text("This issues a fresh set and invalidates the old one. Confirm with your password.")
-                                .font(.system(size: 14))
-                                .foregroundStyle(Palette.muted)
-                            SecureField("Password", text: $password)
-                                .textContentType(.password)
-                                .skarbField()
-                            if let error { FormError(error) }
-                            Button(busy ? "Generating…" : "Generate new codes") { Task { await regenerate() } }
-                                .buttonStyle(.skarbPrimary)
-                                .disabled(busy || password.isEmpty)
-                                .opacity(password.isEmpty ? 0.5 : 1)
-                        }
-                        .padding(20)
-                    }
-                }
-                .scrollDismissesKeyboard(.interactively)
-            }
-            .navigationTitle("Recovery codes")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if codes == nil {
-                    ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() } }
-                }
+        SheetScaffold(title: "Recovery codes") {
+            if let codes = model.codes {
+                RecoveryCodesView(codes: codes)
+                Footnote("The previous set no longer works. Replace whatever copy you kept.")
+                Button("Done") { dismiss() }.buttonStyle(.skarbPrimary)
+            } else {
+                Text("This issues a fresh set and invalidates the old one. Confirm with your password.")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Palette.muted)
+                SecureField("Password", text: $model.password)
+                    .textContentType(.password)
+                    .skarbField()
+                if let error = model.error { FormError(error) }
+                Button(model.busy ? "Generating…" : "Generate new codes") { Task { await model.regenerate() } }
+                    .buttonStyle(.skarbPrimary)
+                    .disabled(model.busy || model.password.isEmpty)
+                    .opacity(model.password.isEmpty ? 0.5 : 1)
             }
         }
-        .interactiveDismissDisabled(codes != nil)
-    }
-
-    private func regenerate() async {
-        busy = true
-        defer { busy = false }
-        error = nil
-        do {
-            codes = try await APIClient.shared.newRecoveryCodes(currentPassword: password).recoveryCodes
-            password = ""
-        } catch {
-            model.handle(error)
-            self.error = error.localizedDescription
-        }
-    }
-}
-
-/// Single-use codes, shown once. Copying them is the only thing that matters here, so the
-/// button that does it sits right under them.
-struct RecoveryCodesView: View {
-    let codes: [String]
-    @State private var copied = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Each code signs you in once if you lose your authenticator. Store them somewhere safe — this is the only time they are shown.")
-                .font(.system(size: 13))
-                .foregroundStyle(Palette.muted)
-                .lineSpacing(2)
-
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                ForEach(codes, id: \.self) { code in
-                    Text(code)
-                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(Palette.ink)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 9)
-                        .background(Palette.surface2, in: .rect(cornerRadius: 8))
-                        .textSelection(.enabled)
-                }
-            }
-
-            Button {
-                UIPasteboard.general.string = codes.joined(separator: "\n")
-                copied = true
-            } label: {
-                Label(copied ? "Copied" : "Copy all codes", systemImage: copied ? "checkmark" : "doc.on.doc")
-                    .font(.system(size: 14, weight: .semibold))
-            }
-            .foregroundStyle(Palette.accent)
-        }
+        // Codes that were never written down are a lock-out waiting to happen.
+        .interactiveDismissDisabled(model.codes != nil)
     }
 }

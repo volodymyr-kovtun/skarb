@@ -19,6 +19,7 @@ struct AuthShell<Content: View, Footer: View>: View {
                             Text(title)
                                 .font(.display(28))
                                 .foregroundStyle(Palette.ink)
+                                .multilineTextAlignment(.center)
                             if let subtitle {
                                 Text(subtitle)
                                     .font(.system(size: 14))
@@ -52,30 +53,32 @@ extension AuthShell where Footer == EmptyView {
     }
 }
 
-/// Inline error, sized to sit under a field without shifting the card around.
-struct FormError: View {
-    let message: String
+/// A labelled field in the signed-out screens' style.
+struct AuthField<Content: View>: View {
+    let label: String
+    @ViewBuilder var content: Content
 
-    init(_ message: String) { self.message = message }
+    init(_ label: String, @ViewBuilder content: () -> Content) {
+        self.label = label
+        self.content = content()
+    }
 
     var body: some View {
-        Text(message)
-            .font(.system(size: 14, weight: .medium))
-            .foregroundStyle(Palette.danger)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(Palette.danger.opacity(0.1), in: .rect(cornerRadius: Palette.Radius.row))
-            .accessibilityAddTraits(.isStaticText)
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Palette.muted)
+            content.skarbField()
+        }
     }
 }
 
 /// Where the app looks for a ledger. Editable before sign-in and from Settings after, because
 /// a self-hosted app whose address is baked in is a self-hosted app you can only use once.
 struct ServerSheet: View {
-    @Environment(AppModel.self) private var model
+    @Environment(AppContainer.self) private var app
     @Environment(\.dismiss) private var dismiss
-    @State private var text = APIClient.shared.baseURL.absoluteString
+    @State private var text = ""
     @State private var error: String?
 
     var body: some View {
@@ -113,14 +116,15 @@ struct ServerSheet: View {
                 }
             }
         }
+        .onAppear { if text.isEmpty { text = app.server.baseURL.absoluteString } }
     }
 
     private func save() {
-        guard let url = ServerSettings.normalize(text) else {
+        guard let url = ServerAddressInput.normalize(text) else {
             error = "That doesn't look like a web address."
             return
         }
         dismiss()
-        Task { await model.switchServer(to: url) }
+        Task { await app.switchServer(to: url) }
     }
 }
